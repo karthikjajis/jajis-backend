@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jaji's Admin</title>
+<link rel="icon" href="logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#111;--ink2:#444;--mute:#888;--line:#e7e7e7;--bg:#f6f6f4;--card:#fff;--gold:#b08d57;--green:#16803c;--red:#c62828;--amber:#b26a00;--blue:#1d4ed8;--r:10px}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.45 Inter,system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:inherit}
+.hide{display:none!important}
+/* layout */
+.app{display:grid;grid-template-columns:232px 1fr;min-height:100vh}
+nav{background:#fff;border-right:1px solid var(--line);padding:22px 14px;position:sticky;top:0;height:100vh;overflow:auto}
+nav .logo{display:block;margin:0 auto 6px;width:110px}
+nav .tag{text-align:center;color:var(--mute);font-size:11px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:22px}
+nav .grp{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.1em;margin:18px 10px 6px}
+nav a{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;text-decoration:none;color:var(--ink2);cursor:pointer}
+nav a:hover{background:#f2f2f0}
+nav a.on{background:var(--ink);color:#fff}
+nav a .n{margin-left:auto;font-size:11px;background:var(--gold);color:#fff;border-radius:10px;padding:0 7px}
+nav .me{margin-top:26px;padding:10px;border-top:1px solid var(--line);font-size:12px;color:var(--mute)}
+main{padding:26px 32px;max-width:1280px;width:100%}
+h1{font-size:22px;margin:0 0 4px;font-weight:700;letter-spacing:-.01em}
+.sub{color:var(--mute);margin:0 0 20px}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.bar .grow{flex:1}
+/* controls */
+.btn{border:1px solid var(--ink);background:var(--ink);color:#fff;border-radius:8px;padding:8px 14px;cursor:pointer;font-weight:500;white-space:nowrap}
+.btn:hover{opacity:.88}
+.btn.ghost{background:#fff;color:var(--ink);border-color:var(--line)}
+.btn.ghost:hover{border-color:var(--ink)}
+.btn.red{background:#fff;color:var(--red);border-color:#f0caca}
+.btn.sm{padding:5px 10px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:wait}
+input,select,textarea{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff;width:100%}
+input:focus,select:focus,textarea:focus{outline:2px solid #0001;border-color:var(--ink)}
+textarea{min-height:110px;resize:vertical}
+.search{max-width:320px}
+.tabs{display:flex;gap:4px;flex-wrap:wrap}
+.tabs button{border:1px solid var(--line);background:#fff;border-radius:20px;padding:5px 12px;cursor:pointer;font-size:13px}
+.tabs button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+/* cards + tables */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r)}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+.kpi{padding:16px 18px}
+.kpi .l{color:var(--mute);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+.kpi .v{font-size:26px;font-weight:700;margin-top:4px}
+.kpi .h{font-size:12px;color:var(--mute)}
+.two{display:grid;grid-template-columns:1.4fr 1fr;gap:14px}
+.card h3{margin:0;padding:14px 16px;border-bottom:1px solid var(--line);font-size:14px}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:12px;color:var(--mute);font-weight:500;padding:10px 12px;border-bottom:1px solid var(--line);background:#fafaf8;position:sticky;top:0}
+td{padding:10px 12px;border-bottom:1px solid #f0f0ee;vertical-align:middle}
+tr.click{cursor:pointer}
+tr.click:hover td{background:#fafaf8}
+.tbl{overflow:auto;max-height:calc(100vh - 210px)}
+.thumb{width:44px;height:44px;border-radius:8px;object-fit:cover;background:#eee;border:1px solid var(--line);display:block}
+.mute{color:var(--mute)}
+.mono{font-family:ui-monospace,Menlo,monospace;font-size:12px}
+.right{text-align:right}
+.badge{display:inline-block;padding:2px 9px;border-radius:12px;font-size:12px;font-weight:500;background:#eee;color:#333;white-space:nowrap}
+.b-green{background:#e6f4ea;color:var(--green)}.b-red{background:#fdecea;color:var(--red)}.b-amber{background:#fff4e0;color:var(--amber)}
+.b-blue{background:#e8efff;color:var(--blue)}.b-gray{background:#f0f0ee;color:#555}.b-gold{background:#f6efe3;color:#7a5c2e}
+.empty{padding:40px;text-align:center;color:var(--mute)}
+/* drawer */
+.shade{position:fixed;inset:0;background:#0006;z-index:20;display:flex;justify-content:flex-end}
+.drawer{background:#fff;width:min(720px,100%);height:100%;overflow:auto;padding:24px 28px;box-shadow:-10px 0 30px #0002}
+.drawer h2{margin:0 0 4px;font-size:19px}
+.drawer .x{float:right;border:0;background:none;font-size:24px;cursor:pointer;color:var(--mute);line-height:1}
+.sec{margin:20px 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.f label{display:block;font-size:12px;color:var(--ink2);margin-bottom:4px;font-weight:500}
+.f .req{color:var(--red)}
+.f .err{color:var(--red);font-size:12px;margin-top:3px}
+.f.full{grid-column:1/-1}
+.kv{display:grid;grid-template-columns:170px 1fr;gap:6px 14px}
+.kv div:nth-child(odd){color:var(--mute)}
+.imgs{display:flex;gap:10px;flex-wrap:wrap}
+.slot{width:112px}
+.slot .pic{width:112px;height:112px;border:1px dashed #ccc;border-radius:10px;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;background:#fafaf8;color:var(--mute);font-size:12px;text-align:center;position:relative}
+.slot .pic img{width:100%;height:100%;object-fit:cover}
+.slot .pic .spin{position:absolute;inset:0;background:#fffc;display:flex;align-items:center;justify-content:center}
+.slot .row{display:flex;justify-content:space-between;font-size:12px;margin-top:4px}
+.slot .row a{cursor:pointer;color:var(--red)}
+.vt input{padding:6px 8px}
+.actions{display:flex;gap:8px;justify-content:flex-end;margin-top:22px;position:sticky;bottom:-24px;background:#fff;padding:14px 0}
+/* toast + login */
+#toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:8px;z-index:50;box-shadow:0 6px 20px #0003;max-width:90vw}
+#toast.bad{background:var(--red)}
+.login{min-height:100vh;display:flex;align-items:center;justify-content:center}
+.login .card{width:360px;padding:32px}
+.login img{display:block;margin:0 auto 6px;width:130px}
+.login p{text-align:center;color:var(--mute);margin:0 0 22px}
+.login .f{margin-bottom:12px}
+@media (max-width:900px){.app{grid-template-columns:1fr}nav{position:static;height:auto}.kpis,.two,.grid2{grid-template-columns:1fr 1fr}main{padding:18px}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<div id="toast" class="hide"></div>
+<script>
+// ===================================================================== config
+const DEFAULT_API = "https://tbkvtcuqszgmahzswspe.supabase.co/functions/v1/api";
+const qs = new URLSearchParams(location.search);
+if (qs.get("api")) localStorage.setItem("jaji_admin_api", qs.get("api"));
+const API = localStorage.getItem("jaji_admin_api") || DEFAULT_API;
+let TOKEN = localStorage.getItem("jaji_admin_token");
+let ME = null;
+
+// ===================================================================== helpers
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const inr = (v) => v == null || v === "" ? "—" : "₹" + Number(v).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+const dt = (v) => v ? new Date(v).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+const d = (v) => v ? new Date(v + (v.length === 10 ? "T00:00:00" : "")).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+function toast(msg, bad = false) {
+  const t = $("#toast"); t.textContent = msg; t.className = bad ? "bad" : ""; clearTimeout(t._h);
+  t._h = setTimeout(() => t.className = "hide", bad ? 6000 : 2800);
+}
+async function api(path, { method = "GET", body } = {}) {
+  const r = await fetch(API + path, {
+    method, headers: { "Content-Type": "application/json", ...(TOKEN ? { Authorization: "Token " + TOKEN } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (r.status === 401) { logout(); throw new Error("Please log in again."); }
+  const data = r.status === 204 ? null : await r.json().catch(() => null);
+  if (!r.ok) {
+    const e = new Error(data?.detail || data?.message || data?.error || (data?.errors ? "Please fix the highlighted fields" : "Request failed (" + r.status + ")"));
+    e.fields = data?.errors; throw e;
+  }
+  return data;
+}
+function imgUrl(name, w) {
+  if (!name) return "";
+  if (/^https?:/.test(name)) return name;
+  const id = name.startsWith("media/") ? name : "media/" + name;
+  const t = w ? `c_fill,w_${w},h_${w},q_auto,f_auto/` : "";
+  return `https://res.cloudinary.com/${ME?.cloud_name}/image/upload/${t}v1/${id}`;
+}
+const STATUS_BADGE = { pending: "b-amber", confirmed: "b-blue", processing: "b-gold", shipped: "b-blue", delivered: "b-green", cancelled: "b-gray", refunded: "b-gray", failed: "b-red" };
+const badge = (s, cls) => `<span class="badge ${cls || STATUS_BADGE[s] || "b-gray"}">${esc(s)}</span>`;
+const payBadge = (s) => badge(s, s === "paid" ? "b-green" : "b-red");
+
+// ===================================================================== image upload (Cloudinary, signed by our API)
+async function compress(file, maxW = 1200, q = 0.7) {
+  if (!file.type.startsWith("image/") || file.type === "image/gif") return file;
+  const bmp = await createImageBitmap(file);
+  const scale = Math.min(1, maxW / bmp.width);
+  const c = document.createElement("canvas");
+  c.width = Math.round(bmp.width * scale); c.height = Math.round(bmp.height * scale);
+  const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.drawImage(bmp, 0, 0, c.width, c.height);
+  const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", q));
+  return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" });
+}
+async function uploadImage(file, folder) {
+  const small = await compress(file);
+  if (small.size > 1024 * 1024) throw new Error("Image is still over 1 MB after compression — please use a smaller image.");
+  const s = await api("/admin/upload-signature", { method: "POST", body: { folder } });
+  const fd = new FormData();
+  fd.append("file", small, small.name.replace(/[^\w.-]+/g, "_"));
+  for (const k of ["api_key", "timestamp", "signature", "folder", "use_filename", "unique_filename"]) fd.append(k, s[k]);
+  const r = await fetch(`https://api.cloudinary.com/v1_1/${s.cloud_name}/image/upload`, { method: "POST", body: fd });
+  const j = await r.json();
+  if (!r.ok) throw new Error("Upload failed: " + (j.error?.message || r.status));
+  return j.public_id;
+}
+
+// ===================================================================== drawer + generic form
+function drawer(html) {
+  closeDrawer();
+  const s = document.createElement("div"); s.className = "shade"; s.id = "shade";
+  s.innerHTML = `<div class="drawer">${html}</div>`;
+  s.addEventListener("mousedown", (e) => { if (e.target === s) closeDrawer(); });
+  document.body.appendChild(s);
+  return s.firstElementChild;
+}
+function closeDrawer() { $("#shade")?.remove(); }
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawer(); });
+
+function fieldHtml(f, v) {
+  const id = "f_" + f.k, req = f.req ? ' <span class="req">*</span>' : "";
+  let input;
+  if (f.type === "textarea") input = `<textarea id="${id}">${esc(v)}</textarea>`;
+  else if (f.type === "select") input = `<select id="${id}">${f.req ? "" : '<option value=""></option>'}${f.options.map(([val, lab]) => `<option value="${esc(val)}" ${String(v) === String(val) ? "selected" : ""}>${esc(lab)}</option>`).join("")}</select>`;
+  else if (f.type === "image") return imageSlot(f, v);
+  else input = `<input id="${id}" type="${f.type || "text"}" value="${esc(v)}" ${f.step ? `step="${f.step}"` : ""} ${f.placeholder ? `placeholder="${esc(f.placeholder)}"` : ""}>`;
+  return `<div class="f ${f.full || f.type === "textarea" ? "full" : ""}"><label for="${id}">${esc(f.label)}${req}</label>${input}<div class="err" data-err="${f.k}"></div></div>`;
+}
+function imageSlot(f, v) {
+  return `<div class="slot" data-img="${f.k}" data-folder="${f.folder}" data-val="${esc(v || "")}">
+    <div class="pic">${v ? `<img src="${imgUrl(v, 240)}">` : "+ Add image"}</div>
+    <div class="row"><span>${esc(f.label)}${f.req ? ' <span style="color:var(--red)">*</span>' : ""}</span>${v && !f.req ? "<a data-clear>remove</a>" : ""}</div>
+    <input type="file" accept="image/*" class="hide"><div class="err" data-err="${f.k}"></div></div>`;
+}
+function wireImages(root) {
+  root.querySelectorAll(".slot").forEach((slot) => {
+    const file = slot.querySelector("input[type=file]"), pic = slot.querySelector(".pic");
+    pic.onclick = () => file.click();
+    slot.querySelector("[data-clear]")?.addEventListener("click", () => { slot.dataset.val = ""; pic.innerHTML = "+ Add image"; });
+    file.onchange = async () => {
+      if (!file.files[0]) return;
+      pic.insertAdjacentHTML("beforeend", '<div class="spin">Uploading…</div>');
+      try {
+        const id = await uploadImage(file.files[0], slot.dataset.folder);
+        slot.dataset.val = id; pic.innerHTML = `<img src="${imgUrl(id, 240)}">`;
+      } catch (e) { toast(e.message, true); pic.querySelector(".spin")?.remove(); }
+    };
+  });
+}
+function readForm(root, fields) {
+  const out = {};
+  for (const f of fields) {
+    if (f.type === "image") out[f.k] = root.querySelector(`[data-img="${f.k}"]`).dataset.val || null;
+    else out[f.k] = root.querySelector("#f_" + f.k).value;
+  }
+  return out;
+}
+function showErrors(root, fields) {
+  root.querySelectorAll("[data-err]").forEach((e) => e.textContent = "");
+  for (const [k, m] of Object.entries(fields || {})) { const e = root.querySelector(`[data-err="${k}"]`); if (e) e.textContent = m; }
+}
+
+// ===================================================================== simple resources (website content)
+const IMG = (k, label, folder, req) => ({ k, label, type: "image", folder, req });
+const RES = {
+  categories: { title: "Categories", sub: "Product categories shown as filters in the shop.", fields: [{ k: "name", label: "Name", req: 1 }],
+    cols: [["Name", (r) => esc(r.name)]] },
+  salons: { title: "Salons", sub: "Branches shown on the Salons page.", folder: "saloon_images",
+    fields: [{ k: "name", label: "Name", req: 1 }, { k: "location", label: "Location", req: 1 }, { k: "google_map_url", label: "Google Maps link", full: 1 },
+      { k: "description", label: "Description", type: "textarea", req: 1 }, IMG("image", "Main", "saloon_images", 1),
+      ...[1, 2, 3, 4, 5, 6].map((i) => IMG("image" + i, "Photo " + i, "saloon_images"))],
+    cols: [["", (r) => `<img class="thumb" src="${imgUrl(r.image, 88)}">`], ["Name", (r) => `<b>${esc(r.name)}</b>`], ["Location", (r) => esc(r.location)]] },
+  courses: { title: "Academy courses", sub: "Courses listed on the Academy page.",
+    fields: [{ k: "course", label: "Course name", req: 1 }, { k: "duration", label: "Duration", req: 1, placeholder: "e.g. 3 months" },
+      { k: "description", label: "Description", type: "textarea", req: 1 }, IMG("image", "Image", "courses", 1)],
+    cols: [["", (r) => `<img class="thumb" src="${imgUrl(r.image, 88)}">`], ["Course", (r) => `<b>${esc(r.course)}</b>`], ["Duration", (r) => esc(r.duration)]] },
+  food: { title: "Food court menu", sub: "Dishes on the Food Court page.",
+    fields: [{ k: "title", label: "Dish", req: 1 }, { k: "price", label: "Price (₹)", req: 1, type: "number", step: "0.01" },
+      { k: "description", label: "Description", type: "textarea", req: 1 }, IMG("image", "Image", "food_images", 1)],
+    cols: [["", (r) => `<img class="thumb" src="${imgUrl(r.image, 88)}">`], ["Dish", (r) => `<b>${esc(r.title)}</b>`], ["Price", (r) => inr(r.price)]] },
+  cosmetics: { title: "Cosmetics", sub: "Items on the Cosmetics page.",
+    fields: [{ k: "title", label: "Name", req: 1 }, { k: "price", label: "Price (₹)", req: 1, type: "number", step: "0.01" },
+      { k: "description", label: "Description", type: "textarea", req: 1 }, IMG("image", "Image", "cosmetics_images", 1)],
+    cols: [["", (r) => `<img class="thumb" src="${imgUrl(r.image, 88)}">`], ["Name", (r) => `<b>${esc(r.title)}</b>`], ["Price", (r) => inr(r.price)]] },
+  banners: { title: "Home banner", sub: "The newest banner is the one shown on the home page.",
+    fields: [IMG("image", "Banner", "banner_image", 1)],
+    cols: [["", (r) => `<img class="thumb" style="width:120px" src="${imgUrl(r.image)}">`], ["Uploaded", (r) => dt(r.uploaded_at)], ["", (r, i) => i === 0 ? badge("live", "b-green") : ""]] },
+  eventhall: { title: "Event hall bookings", sub: "Enquiries from the website. A booked date can't be chosen again online — add a booking here to block a date.",
+    fields: [{ k: "name", label: "Name", req: 1 }, { k: "phone", label: "Phone", req: 1 }, { k: "email", label: "Email", req: 1, type: "email" },
+      { k: "event_date", label: "Event date", req: 1, type: "date" },
+      { k: "event_type", label: "Event type", req: 1, type: "select", options: [["wedding", "Wedding"], ["reception", "Reception"], ["birthday", "Birthday"], ["corporate", "Corporate"], ["other", "Other"]] },
+      { k: "category", label: "Hall", req: 1, type: "select", options: [["ac", "AC"], ["non-ac", "Non-AC"]] }],
+    cols: [["Event date", (r) => `<b>${d(r.event_date)}</b> ${r.event_date >= new Date().toISOString().slice(0, 10) ? badge("upcoming", "b-blue") : ""}`],
+      ["Name", (r) => esc(r.name)], ["Phone", (r) => `<a href="tel:${esc(r.phone)}">${esc(r.phone)}</a>`], ["Email", (r) => esc(r.email)],
+      ["Type", (r) => esc(r.event_type)], ["Hall", (r) => esc(r.category)], ["Received", (r) => dt(r.created_at)]] },
+};
+
+async function resourcePage(key) {
+  const R = RES[key];
+  view(`<h1>${R.title}</h1><p class="sub">${R.sub}</p>
+    <div class="bar"><input class="search" id="q" placeholder="Search…"><div class="grow"></div><button class="btn" id="add">+ Add</button></div>
+    <div class="card tbl" id="list"><div class="empty">Loading…</div></div>`);
+  let rows = [];
+  const draw = () => {
+    const term = $("#q").value.toLowerCase();
+    const shown = rows.filter((r) => !term || JSON.stringify(r).toLowerCase().includes(term));
+    $("#list").innerHTML = shown.length ? `<table><tr>${R.cols.map((c) => `<th>${c[0]}</th>`).join("")}</tr>
+      ${shown.map((r, i) => `<tr class="click" data-id="${r.id}">${R.cols.map((c) => `<td>${c[1](r, i)}</td>`).join("")}</tr>`).join("")}</table>`
+      : `<div class="empty">Nothing here yet.</div>`;
+    $("#list").querySelectorAll("tr[data-id]").forEach((tr) => tr.onclick = () => edit(rows.find((r) => r.id == tr.dataset.id)));
+  };
+  const load = async () => { rows = await api(`/admin/r/${key}`); draw(); };
+  const edit = (row) => {
+    const imgs = R.fields.filter((f) => f.type === "image"), rest = R.fields.filter((f) => f.type !== "image");
+    const dr = drawer(`<button class="x">×</button><h2>${row ? "Edit" : "Add"} — ${R.title}</h2>
+      <div class="grid2" style="margin-top:16px">${rest.map((f) => fieldHtml(f, row?.[f.k])).join("")}</div>
+      ${imgs.length ? `<div class="sec">Images</div><div class="imgs">${imgs.map((f) => fieldHtml(f, row?.[f.k])).join("")}</div>` : ""}
+      <div class="actions">${row ? '<button class="btn red" id="del">Delete</button><div style="flex:1"></div>' : ""}<button class="btn ghost" id="cancel">Cancel</button><button class="btn" id="save">Save</button></div>`);
+    wireImages(dr);
+    dr.querySelector(".x").onclick = dr.querySelector("#cancel").onclick = closeDrawer;
+    dr.querySelector("#save").onclick = async (e) => {
+      e.target.disabled = true;
+      try {
+        await api(`/admin/r/${key}${row ? "/" + row.id : ""}`, { method: row ? "PATCH" : "POST", body: readForm(dr, R.fields) });
+        closeDrawer(); toast("Saved"); load();
+      } catch (err) { showErrors(dr, err.fields); toast(err.message, true); e.target.disabled = false; }
+    };
+    dr.querySelector("#del")?.addEventListener("click", async () => {
+      if (!confirmDelete()) return;
+      try { await api(`/admin/r/${key}/${row.id}`, { method: "DELETE" }); closeDrawer(); toast("Deleted"); load(); } catch (err) { toast(err.message, true); }
+    });
+  };
+  $("#q").oninput = draw;
+  $("#add").onclick = () => edit(null);
+  await load();
+}
+const confirmDelete = () => window.confirm ? window.confirm("Delete this permanently?") : true;
+
+// ===================================================================== dashboard
+async function dashboard() {
+  view(`<h1>Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}, ${esc(ME.username)}</h1>
+    <p class="sub">Here's what's happening on jajisinnovation.com</p><div id="dash"><div class="empty">Loading…</div></div>`);
+  const x = await api("/admin/dashboard");
+  $("#dash").innerHTML = `
+    <div class="kpis">
+      <div class="card kpi"><div class="l">To ship</div><div class="v">${x.orders.to_ship}</div><div class="h">paid, not yet shipped</div></div>
+      <div class="card kpi"><div class="l">Sales · 30 days</div><div class="v">${inr(x.revenue_30d)}</div><div class="h">${x.orders.paid_30d} paid orders</div></div>
+      <div class="card kpi"><div class="l">Customers</div><div class="v">${x.customers.total}</div><div class="h">+${x.customers.new_30d} in 30 days</div></div>
+      <div class="card kpi"><div class="l">Leads</div><div class="v">${x.leads.franchise_30d + x.leads.upcoming_events}</div><div class="h">${x.leads.franchise_30d} franchise · ${x.leads.upcoming_events} upcoming events</div></div>
+    </div>
+    <div class="two">
+      <div class="card"><h3>Latest orders</h3><table>${x.recent_orders.map((o) => `<tr class="click" data-o="${o.id}"><td><b>#${o.id}</b></td><td>${esc(o.username)}</td>
+        <td>${inr(o.total_amount)}</td><td>${badge(o.status)}</td><td>${payBadge(o.payment_status)}</td><td class="mute">${dt(o.created_at)}</td></tr>`).join("")}</table></div>
+      <div class="card"><h3>Low stock (5 or fewer)</h3>${x.low_stock.length ? `<table>${x.low_stock.map((v) => `<tr class="click" data-p="${v.product_id}"><td>${esc(v.title)}<div class="mute">${esc(v.quantity_label)}</div></td>
+        <td class="right">${v.stock === 0 ? badge("out of stock", "b-red") : badge(v.stock + " left", "b-amber")}</td></tr>`).join("")}</table>` : '<div class="empty">All products are well stocked.</div>'}</div>
+    </div>`;
+  $("#dash").querySelectorAll("[data-o]").forEach((r) => r.onclick = () => orderDrawer(r.dataset.o));
+  $("#dash").querySelectorAll("[data-p]").forEach((r) => r.onclick = () => productDrawer(r.dataset.p));
+}
+
+// ===================================================================== orders
+let orderFilter = { status: "", payment_status: "" };
+async function ordersPage() {
+  const S = [["", "All"], ["confirmed", "To process"], ["processing", "Processing"], ["shipped", "Shipped"], ["delivered", "Delivered"], ["pending", "Pending"], ["cancelled", "Cancelled"], ["refunded", "Refunded"]];
+  view(`<h1>Orders</h1><p class="sub">Unpaid Razorpay orders from the last 7 days are re-checked with Razorpay each time this page loads.</p>
+    <div class="bar"><div class="tabs" id="tabs">${S.map(([v, l]) => `<button data-s="${v}" class="${orderFilter.status === v ? "on" : ""}">${l}</button>`).join("")}</div>
+    <div class="grow"></div><select id="pay" style="width:auto"><option value="">Any payment</option><option value="paid">Paid</option><option value="unpaid">Unpaid</option></select>
+    <input class="search" id="q" placeholder="Order #, customer, Razorpay ID…"></div>
+    <div class="card tbl" id="list"><div class="empty">Loading…</div></div>`);
+  $("#pay").value = orderFilter.payment_status;
+  const load = async () => {
+    const p = new URLSearchParams({ ...orderFilter, q: $("#q").value }); [...p.keys()].forEach((k) => !p.get(k) && p.delete(k));
+    const rows = await api("/admin/orders?" + p);
+    $("#list").innerHTML = rows.length ? `<table><tr><th>Order</th><th>Customer</th><th>Items</th><th class="right">Total</th><th>Status</th><th>Payment</th><th>Ship to</th><th>Placed</th></tr>
+      ${rows.map((o) => `<tr class="click" data-id="${o.id}"><td><b>#${o.id}</b></td><td>${esc(o.username)}<div class="mute">${esc(o.email)}</div></td>
+        <td>${o.items_count}</td><td class="right">${inr(o.total_amount)}</td><td>${badge(o.status)}</td><td>${payBadge(o.payment_status)}</td>
+        <td>${o.ship_city ? esc(o.ship_city) + " – " + esc(o.ship_pin) : "—"}</td><td class="mute">${dt(o.created_at)}</td></tr>`).join("")}</table>` : '<div class="empty">No orders match.</div>';
+    $("#list").querySelectorAll("tr[data-id]").forEach((tr) => tr.onclick = () => orderDrawer(tr.dataset.id, load));
+  };
+  $("#tabs").onclick = (e) => { if (e.target.dataset.s === undefined) return; orderFilter.status = e.target.dataset.s; $("#tabs").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b === e.target)); load(); };
+  $("#pay").onchange = () => { orderFilter.payment_status = $("#pay").value; load(); };
+  let t; $("#q").oninput = () => { clearTimeout(t); t = setTimeout(load, 300); };
+  await load();
+}
+const addr = (a) => a ? [a.label, a.line1, a.line2, [a.city, a.state].filter(Boolean).join(", ") + " – " + a.postal_code, a.country, a.phone && "Phone: " + a.phone].filter(Boolean).map(esc).join("<br>") : '<span class="mute">—</span>';
+async function orderDrawer(id, onChange) {
+  const dr = drawer('<div class="empty">Loading…</div>');
+  const o = await api("/admin/orders/" + id);
+  const STAT = ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled", "refunded", "failed"];
+  dr.innerHTML = `<button class="x">×</button><h2>Order #${o.id}</h2>
+    <div class="mute">${dt(o.created_at)} · ${esc(o.customer.username)} · <a href="mailto:${esc(o.customer.email)}">${esc(o.customer.email)}</a></div>
+    <div class="bar" style="margin-top:16px">${badge(o.status)} ${payBadge(o.payment_status)}<div class="grow"></div>
+      <select id="st" style="width:auto">${STAT.map((s) => `<option ${s === o.status ? "selected" : ""}>${s}</option>`).join("")}</select>
+      <button class="btn sm" id="saveSt">Update status</button></div>
+    <div class="sec">Items</div>
+    <div class="card"><table>${o.items.map((i) => `<tr><td style="width:56px"><img class="thumb" src="${i.product_image || ""}"></td>
+      <td>${esc(i.product_title)}<div class="mute">${esc(i.variant.quantity_label)}${i.variant.sku ? " · SKU " + esc(i.variant.sku) : ""}</div></td>
+      <td>× ${i.quantity}</td><td class="right">${inr(i.total_price)}</td></tr>`).join("") || '<tr><td class="empty">No items recorded</td></tr>'}
+      <tr><td></td><td class="mute">Shipping</td><td></td><td class="right">${inr(o.shipping_cost)}</td></tr>
+      <tr><td></td><td><b>Total</b></td><td></td><td class="right"><b>${inr(o.total_amount)}</b></td></tr></table></div>
+    <div class="grid2"><div><div class="sec">Ship to</div>${addr(o.shipping_address)}</div><div><div class="sec">Bill to</div>${addr(o.billing_address)}</div></div>
+    <div class="sec">Payment</div>
+    <div class="kv"><div>Method</div><div>${esc(o.payment_method || "—")}</div>
+      <div>Razorpay order</div><div class="mono">${esc(o.razorpay_order_id || "—")}</div>
+      <div>Razorpay payment</div><div class="mono">${esc(o.razorpay_payment_id || o.transaction_id || "—")}</div></div>
+    <div class="actions"><button class="btn ghost" id="sync">🔄 Check payment with Razorpay</button><button class="btn ghost" id="mail">✉ Resend confirmation email</button></div>`;
+  dr.querySelector(".x").onclick = closeDrawer;
+  dr.querySelector("#saveSt").onclick = async () => {
+    try { await api("/admin/orders/" + id, { method: "PATCH", body: { status: $("#st").value } }); toast("Status updated"); closeDrawer(); onChange?.(); } catch (e) { toast(e.message, true); }
+  };
+  dr.querySelector("#sync").onclick = async (e) => {
+    e.target.disabled = true;
+    try { const r = await api(`/admin/orders/${id}/sync`, { method: "POST" }); toast(r.message); if (r.paid) { closeDrawer(); onChange?.(); } } catch (err) { toast(err.message, true); }
+    e.target.disabled = false;
+  };
+  dr.querySelector("#mail").onclick = async (e) => {
+    if (o.payment_status !== "paid" && !confirm("This order is not paid. Send the confirmation email anyway?")) return;
+    e.target.disabled = true; try { toast((await api(`/admin/orders/${id}/resend-email`, { method: "POST" })).message); } catch (err) { toast(err.message, true); } e.target.disabled = false;
+  };
+}
+
+// ===================================================================== products
+let CATS = [];
+async function productsPage() {
+  view(`<h1>Products</h1><p class="sub">Your online shop. Click a product to edit details, images, prices and stock.</p>
+    <div class="bar"><input class="search" id="q" placeholder="Search products…"><select id="cat" style="width:auto"><option value="">All categories</option></select>
+    <div class="grow"></div><button class="btn" id="add">+ New product</button></div>
+    <div class="card tbl" id="list"><div class="empty">Loading…</div></div>`);
+  CATS = await api("/admin/r/categories");
+  $("#cat").insertAdjacentHTML("beforeend", CATS.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join(""));
+  let rows = [];
+  const draw = () => {
+    const term = $("#q").value.toLowerCase(), cat = $("#cat").value;
+    const shown = rows.filter((p) => (!cat || p.category_id == cat) && (!term || (p.title + " " + p.brand).toLowerCase().includes(term)));
+    $("#list").innerHTML = shown.length ? `<table><tr><th></th><th>Product</th><th>Category</th><th>Variants</th><th class="right">From</th><th class="right">Stock</th><th>Updated</th></tr>
+      ${shown.map((p) => `<tr class="click" data-id="${p.id}"><td style="width:56px"><img class="thumb" src="${imgUrl(p.image1, 88)}"></td>
+        <td><b>${esc(p.title)}</b><div class="mute">${esc(p.brand || "")}</div></td><td>${esc(p.category_name)}</td><td>${p.variants}</td>
+        <td class="right">${inr(p.from_price)}</td><td class="right">${p.stock === 0 ? badge("out", "b-red") : p.stock <= 5 ? badge(p.stock, "b-amber") : p.stock}</td>
+        <td class="mute">${dt(p.updated_at)}</td></tr>`).join("")}</table>` : '<div class="empty">No products match.</div>';
+    $("#list").querySelectorAll("tr[data-id]").forEach((tr) => tr.onclick = () => productDrawer(tr.dataset.id, load));
+  };
+  const load = async () => { rows = await api("/admin/r/products"); draw(); };
+  $("#q").oninput = draw; $("#cat").onchange = draw;
+  $("#add").onclick = () => productDrawer(null, load);
+  await load();
+}
+async function productDrawer(id, onChange) {
+  if (!CATS.length) CATS = await api("/admin/r/categories");
+  const dr = drawer('<div class="empty">Loading…</div>');
+  const p = id ? await api("/admin/r/products/" + id) : { brand: "jajis" };
+  let variants = id ? await api("/admin/r/variants?product_id=" + id) : [];
+  const F = [
+    { k: "title", label: "Product name", req: 1, full: 1 },
+    { k: "category_id", label: "Category", req: 1, type: "select", options: CATS.map((c) => [c.id, c.name]) },
+    { k: "brand", label: "Brand" },
+    { k: "description", label: "Description", type: "textarea", req: 1 },
+    IMG("image1", "Main image", "product_images", 1), IMG("image2", "Image 2", "product_images"), IMG("image3", "Image 3", "product_images"), IMG("image4", "Image 4", "product_images"),
+  ];
+  const vrow = (v, i) => `<tr data-i="${i}"><td><input data-k="quantity_label" value="${esc(v.quantity_label)}" placeholder="e.g. 250ml"></td>
+    <td><input data-k="mrp" type="number" step="0.01" value="${esc(v.mrp)}"></td><td><input data-k="price" type="number" step="0.01" value="${esc(v.price)}"></td>
+    <td><input data-k="stock" type="number" min="0" value="${esc(v.stock ?? 0)}"></td><td><input data-k="sku" value="${esc(v.sku || "")}"></td>
+    <td><button class="btn red sm" data-rm="${i}">✕</button></td></tr>`;
+  dr.innerHTML = `<button class="x">×</button><h2>${id ? esc(p.title) : "New product"}</h2>${id ? `<div class="mute">Product #${p.id} · created ${dt(p.created_at)}</div>` : ""}
+    <div class="grid2" style="margin-top:16px">${F.filter((f) => f.type !== "image").map((f) => fieldHtml(f, p[f.k])).join("")}</div>
+    <div class="sec">Images <span style="text-transform:none;letter-spacing:0">(compressed automatically, like before)</span></div>
+    <div class="imgs">${F.filter((f) => f.type === "image").map((f) => fieldHtml(f, p[f.k])).join("")}</div>
+    <div class="sec">Sizes, prices & stock</div>
+    <div class="card vt"><table><tr><th>Size / quantity</th><th>MRP ₹</th><th>Selling price ₹</th><th>Stock</th><th>SKU</th><th></th></tr><tbody id="vbody">${variants.map(vrow).join("")}</tbody></table>
+    <div style="padding:10px"><button class="btn ghost sm" id="addv">+ Add size</button></div></div>
+    <div class="actions">${id ? '<button class="btn red" id="del">Delete product</button><div style="flex:1"></div>' : ""}<button class="btn ghost" id="cancel">Cancel</button><button class="btn" id="save">Save product</button></div>`;
+  wireImages(dr);
+  const collect = () => [...dr.querySelectorAll("#vbody tr")].map((tr) => {
+    const v = { ...variants[tr.dataset.i] }; tr.querySelectorAll("input").forEach((i) => v[i.dataset.k] = i.value); return v;
+  });
+  const redraw = () => { dr.querySelector("#vbody").innerHTML = variants.map(vrow).join(""); };
+  dr.querySelector("#addv").onclick = () => { variants = collect(); variants.push({ stock: 0 }); redraw(); };
+  dr.querySelector("#vbody").onclick = (e) => {
+    if (!e.target.dataset.rm) return;
+    variants = collect(); const v = variants[e.target.dataset.rm];
+    if (v.id) v._delete = true, e.target.closest("tr").style.display = "none"; else { variants.splice(e.target.dataset.rm, 1); redraw(); }
+  };
+  dr.querySelector(".x").onclick = dr.querySelector("#cancel").onclick = closeDrawer;
+  dr.querySelector("#save").onclick = async (e) => {
+    e.target.disabled = true;
+    try {
+      const vs = collect().map((v, i) => ({ ...v, _delete: variants[i]?._delete }));
+      for (const v of vs) if (!v._delete && (!v.quantity_label || v.mrp === "" || v.price === "")) throw new Error("Each size needs a name, MRP and price.");
+      const saved = await api(`/admin/r/products${id ? "/" + id : ""}`, { method: id ? "PATCH" : "POST", body: readForm(dr, F) });
+      for (const v of vs) {
+        const body = { product_id: saved.id, quantity_label: v.quantity_label, mrp: v.mrp, price: v.price, stock: v.stock || 0, sku: v.sku || null };
+        if (v._delete && v.id) await api("/admin/r/variants/" + v.id, { method: "DELETE" });
+        else if (v.id) await api("/admin/r/variants/" + v.id, { method: "PATCH", body });
+        else if (!v._delete) await api("/admin/r/variants", { method: "POST", body });
+      }
+      closeDrawer(); toast("Product saved"); onChange?.();
+    } catch (err) { showErrors(dr, err.fields); toast(err.message, true); e.target.disabled = false; }
+  };
+  dr.querySelector("#del")?.addEventListener("click", async () => {
+    if (!confirmDelete()) return;
+    try { await api("/admin/r/products/" + id, { method: "DELETE" }); closeDrawer(); toast("Product deleted"); onChange?.(); } catch (err) { toast(err.message, true); }
+  });
+}
+
+// ===================================================================== franchise enquiries
+async function franchisePage() {
+  view(`<h1>Franchise enquiries</h1><p class="sub">Applications from the website's Franchise page (private — no longer visible to the public).</p>
+    <div class="bar"><input class="search" id="q" placeholder="Search name, city, phone…"></div><div class="card tbl" id="list"><div class="empty">Loading…</div></div>`);
+  let rows = await api("/admin/r/franchise");
+  const draw = () => {
+    const t = $("#q").value.toLowerCase(); const shown = rows.filter((r) => !t || JSON.stringify(r).toLowerCase().includes(t));
+    $("#list").innerHTML = shown.length ? `<table><tr><th>Received</th><th>Name</th><th>Preferred city</th><th>Budget</th><th>Start</th><th>Phone</th></tr>
+      ${shown.map((r) => `<tr class="click" data-id="${r.id}"><td class="mute">${dt(r.created_at)}</td><td><b>${esc(r.full_name)}</b><div class="mute">${esc(r.email)}</div></td>
+        <td>${esc(r.preferred_city)}, ${esc(r.state)}</td><td>${esc(r.investment_budget)}</td><td>${esc(r.plan_to_start)}</td><td>${esc(r.mobile_number)}</td></tr>`).join("")}</table>` : '<div class="empty">No enquiries yet.</div>';
+    $("#list").querySelectorAll("tr[data-id]").forEach((tr) => tr.onclick = () => show(rows.find((r) => r.id == tr.dataset.id)));
+  };
+  const L = { full_name: "Full name", mobile_number: "Mobile", whatsapp_number: "WhatsApp", email: "Email", age_group: "Age group", current_city_district: "Current city", state: "State",
+    occupation: "Occupation", has_business_exp: "Business experience", business_exp_details: "Business details", has_salon_exp: "Salon/beauty experience", applicant_type: "Applicant type",
+    preferred_city: "Preferred city", preferred_area: "Preferred area", has_commercial_property: "Commercial property", property_size: "Property size", property_location_link: "Location link",
+    investment_budget: "Budget", investment_source: "Source of funds", plan_to_start: "Start timeline", daily_operations_involvement: "Daily involvement" };
+  const show = (r) => {
+    const dr = drawer(`<button class="x">×</button><h2>${esc(r.full_name)}</h2><div class="mute">Received ${dt(r.created_at)}</div>
+      <div class="bar" style="margin-top:14px"><a class="btn sm" href="tel:${esc(r.mobile_number)}">Call</a>
+      <a class="btn ghost sm" href="https://wa.me/${esc(String(r.whatsapp_number || r.mobile_number).replace(/\D/g, ""))}" target="_blank">WhatsApp</a>
+      <a class="btn ghost sm" href="mailto:${esc(r.email)}">Email</a></div>
+      <div class="kv" style="margin-top:12px">${Object.entries(L).map(([k, l]) => `<div>${l}</div><div>${k === "property_location_link" && /^https?:/.test(r[k] || "") ? `<a href="${esc(r[k])}" target="_blank">Open link</a>` : esc(r[k] || "—")}</div>`).join("")}</div>
+      <div class="actions"><button class="btn red" id="del">Delete enquiry</button></div>`);
+    dr.querySelector(".x").onclick = closeDrawer;
+    dr.querySelector("#del").onclick = async () => { if (!confirmDelete()) return; await api("/admin/r/franchise/" + r.id, { method: "DELETE" }); closeDrawer(); rows = rows.filter((x) => x.id !== r.id); draw(); toast("Deleted"); };
+  };
+  $("#q").oninput = draw; draw();
+}
+
+// ===================================================================== payments
+async function paymentsPage() {
+  view(`<h1>Payments</h1><p class="sub">Every Razorpay checkout attempt. If a customer paid but no order was created, recover it here.</p>
+    <div class="bar"><div class="tabs" id="tabs"><button class="on" data-o="">All</button><button data-o="1">⚠ No order linked</button></div></div>
+    <div class="card tbl" id="list"><div class="empty">Loading…</div></div>`);
+  let orphaned = "";
+  const load = async () => {
+    const rows = await api("/admin/transactions" + (orphaned ? "?orphaned=1" : ""));
+    const sb = (s) => badge(s, s === "success" ? "b-green" : s === "failed" ? "b-red" : "b-amber");
+    $("#list").innerHTML = rows.length ? `<table><tr><th>When</th><th>Customer</th><th class="right">Amount</th><th>Status</th><th>Razorpay order</th><th>Payment</th><th>Order</th><th></th></tr>
+      ${rows.map((t) => `<tr><td class="mute">${dt(t.created_at)}</td><td>${esc(t.username)}</td><td class="right">${inr(t.amount)}</td><td>${sb(t.status)}</td>
+        <td class="mono">${esc(t.razorpay_order_id)}</td><td class="mono">${esc(t.razorpay_payment_id || "—")}</td>
+        <td>${t.order_id ? `<a href="#" data-o="${t.order_id}">#${t.order_id}</a>` : badge("no order", "b-red")}</td>
+        <td>${!t.order_id && ["success", "created"].includes(t.status) ? `<button class="btn sm" data-r="${t.id}">Recover order</button>` : ""}</td></tr>`).join("")}</table>` : '<div class="empty">Nothing to show — all payments are linked to orders.</div>';
+    $("#list").querySelectorAll("[data-o]").forEach((a) => a.onclick = (e) => { e.preventDefault(); orderDrawer(a.dataset.o); });
+    $("#list").querySelectorAll("[data-r]").forEach((b) => b.onclick = async () => {
+      b.disabled = true; try { toast((await api(`/admin/transactions/${b.dataset.r}/recreate`, { method: "POST" })).message); load(); } catch (e) { toast(e.message, true); b.disabled = false; }
+    });
+  };
+  $("#tabs").onclick = (e) => { if (e.target.dataset.o === undefined) return; orphaned = e.target.dataset.o; $("#tabs").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b === e.target)); load(); };
+  await load();
+}
+
+// ===================================================================== customers
+async function customersPage() {
+  view(`<h1>Customers</h1><p class="sub">Accounts registered on the website.</p>
+    <div class="bar"><input class="search" id="q" placeholder="Search username or email…"></div><div class="card tbl" id="list"><div class="empty">Loading…</div></div>`);
+  const load = async () => {
+    const rows = await api("/admin/users" + ($("#q").value ? "?q=" + encodeURIComponent($("#q").value) : ""));
+    $("#list").innerHTML = `<table><tr><th>Username</th><th>Email</th><th>Paid orders</th><th>Joined</th><th>Last login</th><th></th></tr>
+      ${rows.map((u) => `<tr><td><b>${esc(u.username)}</b></td><td>${esc(u.email)}</td><td>${u.paid_orders}</td><td class="mute">${dt(u.date_joined)}</td>
+        <td class="mute">${dt(u.last_login)}</td><td>${u.is_staff ? badge("staff", "b-gold") : ""}${u.is_active ? "" : badge("disabled", "b-red")}</td></tr>`).join("")}</table>`;
+  };
+  let t; $("#q").oninput = () => { clearTimeout(t); t = setTimeout(load, 300); };
+  await load();
+}
+
+// ===================================================================== shell + routing
+const PAGES = [
+  ["Overview", [["dashboard", "Dashboard", dashboard]]],
+  ["Shop", [["orders", "Orders", ordersPage], ["products", "Products", productsPage], ["categories", "Categories", () => resourcePage("categories")],
+    ["payments", "Payments", paymentsPage], ["customers", "Customers", customersPage]]],
+  ["Leads", [["eventhall", "Event hall bookings", () => resourcePage("eventhall")], ["franchise", "Franchise enquiries", franchisePage]]],
+  ["Website", [["banners", "Home banner", () => resourcePage("banners")], ["salons", "Salons", () => resourcePage("salons")],
+    ["courses", "Academy courses", () => resourcePage("courses")], ["food", "Food court menu", () => resourcePage("food")], ["cosmetics", "Cosmetics", () => resourcePage("cosmetics")]]],
+];
+function view(html) { $("#page").innerHTML = html; }
+function shell() {
+  $("#root").innerHTML = `<div class="app"><nav><img class="logo" src="logo.png" alt="Jaji's"><div class="tag">Admin</div>
+    ${PAGES.map(([g, items]) => `<div class="grp">${g}</div>${items.map(([k, l]) => `<a data-k="${k}" href="#${k}">${l}</a>`).join("")}`).join("")}
+    <div class="me">Signed in as <b>${esc(ME.username)}</b><br><a href="#" id="out" style="padding:0;display:inline;color:var(--red)">Sign out</a></div></nav>
+    <main id="page"></main></div>`;
+  $("#out").onclick = (e) => { e.preventDefault(); logout(); };
+  route();
+}
+async function route() {
+  closeDrawer();
+  const key = location.hash.slice(1) || "dashboard";
+  const page = PAGES.flatMap((g) => g[1]).find((p) => p[0] === key) || PAGES[0][1][0];
+  document.querySelectorAll("nav a[data-k]").forEach((a) => a.classList.toggle("on", a.dataset.k === page[0]));
+  try { await page[2](); } catch (e) { view(`<div class="empty">Couldn't load this page: ${esc(e.message)}</div>`); }
+}
+window.addEventListener("hashchange", () => ME && route());
+
+function logout() { TOKEN = null; ME = null; localStorage.removeItem("jaji_admin_token"); loginScreen(); }
+function loginScreen() {
+  $("#root").innerHTML = `<div class="login"><form class="card" id="lf"><img src="logo.png" alt="Jaji's"><p>Admin panel</p>
+    <div class="f"><label>Username</label><input id="u" autocomplete="username" required></div>
+    <div class="f"><label>Password</label><input id="p" type="password" autocomplete="current-password" required></div>
+    <button class="btn" style="width:100%;margin-top:6px">Sign in</button>
+    <p style="margin:14px 0 0;font-size:12px">Use the same staff account you used for the old Django admin.</p></form></div>`;
+  $("#lf").onsubmit = async (e) => {
+    e.preventDefault(); const b = e.target.querySelector("button"); b.disabled = true;
+    try {
+      const r = await api("/admin/login", { method: "POST", body: { username: $("#u").value, password: $("#p").value } });
+      TOKEN = r.token; localStorage.setItem("jaji_admin_token", TOKEN); await boot();
+    } catch (err) { toast(err.message, true); b.disabled = false; }
+  };
+}
+async function boot() {
+  if (!TOKEN) return loginScreen();
+  try { ME = await api("/admin/me"); $("#toast").className = "hide"; shell(); } catch { loginScreen(); }
+}
+boot();
+</script>
+</body>
+</html>
