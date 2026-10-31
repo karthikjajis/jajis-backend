@@ -23,6 +23,9 @@ const STATIC_PAGES = [
   ["/about-us", "0.5"],
   ["/management", "0.4"],
   ["/contact", "0.5"],
+  ["/return-policy", "0.3"],
+  ["/terms", "0.2"],
+  ["/privacy", "0.2"],
 ];
 
 const esc = (v: unknown) =>
