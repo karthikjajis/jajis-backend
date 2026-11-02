@@ -2,7 +2,9 @@
 // Every route needs a staff user's token (is_staff = true in auth_user).
 import { sql, iso, money, paise } from "./db.ts";
 import { bad, checkPassword, HttpError, img, json, newTokenKey, notFound, type User } from "./util.ts";
-import { emailOrder, ordersJson, syncOrderWithRazorpay } from "./shop.ts";
+import { emailOrder, ordersJson, syncOrderWithRazorpay, whatsappOrder, whatsappShipped } from "./shop.ts";
+import { emailStatus, sendTestEmail } from "./email.ts";
+import { adminNumbers, sendTemplate, WA, whatsappConfigured } from "./whatsapp.ts";
 
 type Ctx = { req: Request; user: User | null; params: Record<string, string>; body: () => Promise<Record<string, any>> };
 type RouteFn = (path: string, methods: Record<string, (c: Ctx) => Promise<Response> | Response>, opts?: { noAuth?: boolean }) => void;
@@ -306,8 +308,10 @@ export function adminRoutes(route: RouteFn) {
       if (d.transaction_id !== undefined) set.transaction_id = d.transaction_id || null;
       if (!Object.keys(set).length) throw bad({ detail: "Nothing to update" });
       set.updated_at = new Date().toISOString();
+      const [before] = await sql`select status from app_order where id = ${id(params.id)}`;
       const [row] = await sql`update app_order set ${sql(set)} where id = ${id(params.id)} returning *`;
       if (!row) throw notFound();
+      if (set.status === "shipped" && before?.status !== "shipped") await whatsappShipped(row.id);
       return json(rowOut(row));
     },
   });
@@ -322,8 +326,43 @@ export function adminRoutes(route: RouteFn) {
 
   route("/admin/orders/:id/resend-email", { POST: async ({ user, params }) => {
     staff(user);
-    await emailOrder(id(params.id));
+    const r = await emailOrder(id(params.id));
+    if (!r.ok) throw bad({ detail: `Email failed: ${r.error}` });
     return json({ message: "Confirmation email sent." });
+  } });
+
+  route("/admin/orders/:id/resend-whatsapp", { POST: async ({ user, params }) => {
+    staff(user);
+    if (!whatsappConfigured()) throw bad({ detail: "WhatsApp is not set up yet." });
+    await whatsappOrder(id(params.id));
+    return json({ message: "WhatsApp messages sent." });
+  } });
+
+  // ---------------- notifications: status + test sends
+  route("/admin/notifications", { GET: async ({ user }) => {
+    staff(user);
+    return json({
+      email: emailStatus(),
+      whatsapp: { configured: whatsappConfigured(), admin_numbers: adminNumbers(), templates: WA },
+    });
+  } });
+
+  route("/admin/notifications/test-email", { POST: async ({ user, body }) => {
+    staff(user);
+    const d = await body();
+    const to = String(d.to ?? "").trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) throw bad({ detail: "Enter a valid email address." });
+    const r = await sendTestEmail(to);
+    return json({ ...r, message: r.ok ? `Test email sent to ${to}. Check the inbox (and spam folder).` : `Email failed: ${r.error}` });
+  } });
+
+  route("/admin/notifications/test-whatsapp", { POST: async ({ user, body }) => {
+    staff(user);
+    const d = await body();
+    // Meta's ready-made "hello_world" template works before your own templates are approved.
+    const template = String(d.template || "hello_world");
+    const r = await sendTemplate(String(d.to ?? ""), template, Array.isArray(d.params) ? d.params : []);
+    return json({ ...r, message: r.ok ? "WhatsApp message sent." : `WhatsApp failed: ${r.error}` });
   } });
 
   // ---------------- payment transactions / missed-order recovery

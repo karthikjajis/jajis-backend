@@ -369,7 +369,7 @@ async function orderDrawer(id, onChange) {
     <div class="kv"><div>Method</div><div>${esc(o.payment_method || "—")}</div>
       <div>Razorpay order</div><div class="mono">${esc(o.razorpay_order_id || "—")}</div>
       <div>Razorpay payment</div><div class="mono">${esc(o.razorpay_payment_id || o.transaction_id || "—")}</div></div>
-    <div class="actions"><button class="btn ghost" id="sync">🔄 Check payment with Razorpay</button><button class="btn ghost" id="mail">✉ Resend confirmation email</button></div>`;
+    <div class="actions"><button class="btn ghost" id="sync">🔄 Check payment with Razorpay</button><button class="btn ghost" id="mail">✉ Resend confirmation email</button> <button class="btn ghost" id="wa">Resend WhatsApp</button></div>`;
   dr.querySelector(".x").onclick = closeDrawer;
   dr.querySelector("#saveSt").onclick = async () => {
     try { await api("/admin/orders/" + id, { method: "PATCH", body: { status: $("#st").value } }); toast("Status updated"); closeDrawer(); onChange?.(); } catch (e) { toast(e.message, true); }
@@ -383,6 +383,36 @@ async function orderDrawer(id, onChange) {
     if (o.payment_status !== "paid" && !confirm("This order is not paid. Send the confirmation email anyway?")) return;
     e.target.disabled = true; try { toast((await api(`/admin/orders/${id}/resend-email`, { method: "POST" })).message); } catch (err) { toast(err.message, true); } e.target.disabled = false;
   };
+  dr.querySelector("#wa").onclick = async (e) => {
+    e.target.disabled = true; try { toast((await api(`/admin/orders/${id}/resend-whatsapp`, { method: "POST" })).message); } catch (err) { toast(err.message, true); } e.target.disabled = false;
+  };
+}
+
+// ===================================================================== notifications
+async function notificationsPage() {
+  view(`<h1>Email &amp; WhatsApp</h1><p class="sub">Check that order and enquiry messages are going out.</p><div id="nt"><div class="empty">Loading…</div></div>`);
+  const x = await api("/admin/notifications");
+  const ok = (b, y, n) => b ? badge(y, "b-green") : badge(n, "b-red");
+  $("#nt").innerHTML = `<div class="two">
+    <div class="card" style="padding:20px"><h3>Email (Brevo) ${ok(x.email.configured, "set up", "not set up")}</h3>
+      <p class="mute">Sends from <b>${esc(x.email.from || "—")}</b>. Staff alerts go to <b>${esc(x.email.admin)}</b>.</p>
+      <div class="f"><label>Send a test email to</label><input id="te" type="email" value="${esc(ME.email || "")}" style="width:100%"></div>
+      <button class="btn" id="teb" style="margin-top:10px">Send test email</button><p id="ter" class="mute" style="margin-top:10px"></p></div>
+    <div class="card" style="padding:20px"><h3>WhatsApp ${ok(x.whatsapp.configured, "set up", "not set up yet")}</h3>
+      <p class="mute">Staff alert numbers: <b>${x.whatsapp.admin_numbers.length ? x.whatsapp.admin_numbers.map(esc).join(", ") : "none"}</b><br>
+      Templates: ${esc(x.whatsapp.templates.order)} · ${esc(x.whatsapp.templates.admin)} · ${esc(x.whatsapp.templates.shipped)}</p>
+      <div class="f"><label>Send a test WhatsApp to (mobile number)</label><input id="tw" placeholder="98765 43210" style="width:100%"></div>
+      <div class="f" style="margin-top:8px"><label>Template</label><input id="twt" value="hello_world" style="width:100%"></div>
+      <button class="btn" id="twb" style="margin-top:10px" ${x.whatsapp.configured ? "" : "disabled"}>Send test WhatsApp</button><p id="twr" class="mute" style="margin-top:10px"></p></div>
+  </div>`;
+  const run = async (b, out, path, body) => {
+    b.disabled = true; $(out).textContent = "Sending…";
+    try { const r = await api(path, { method: "POST", body }); $(out).innerHTML = r.ok ? `<b style="color:#1a7f37">✓ ${esc(r.message)}</b>` : `<b style="color:var(--red)">${esc(r.message)}</b>`; }
+    catch (err) { $(out).innerHTML = `<b style="color:var(--red)">${esc(err.message)}</b>`; }
+    b.disabled = false;
+  };
+  $("#teb").onclick = (e) => run(e.target, "#ter", "/admin/notifications/test-email", { to: $("#te").value });
+  $("#twb").onclick = (e) => run(e.target, "#twr", "/admin/notifications/test-whatsapp", { to: $("#tw").value, template: $("#twt").value });
 }
 
 // ===================================================================== products
@@ -535,7 +565,7 @@ async function customersPage() {
 
 // ===================================================================== shell + routing
 const PAGES = [
-  ["Overview", [["dashboard", "Dashboard", dashboard]]],
+  ["Overview", [["dashboard", "Dashboard", dashboard], ["notifications", "Email & WhatsApp", notificationsPage]]],
   ["Shop", [["orders", "Orders", ordersPage], ["products", "Products", productsPage], ["categories", "Categories", () => resourcePage("categories")],
     ["payments", "Payments", paymentsPage], ["customers", "Customers", customersPage]]],
   ["Leads", [["eventhall", "Event hall bookings", () => resourcePage("eventhall")], ["franchise", "Franchise enquiries", franchisePage]]],

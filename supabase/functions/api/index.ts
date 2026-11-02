@@ -8,7 +8,7 @@ import {
 import { validate } from "./validate.ts";
 import { sendEventHallEmails, sendFranchiseEmails, sendPasswordResetOtpEmail } from "./email.ts";
 import {
-  addressJson, cartJson, emailOrder, markOrderPaid, ordersJson, productJson, razorpayKeyId, rzp, syncOrderWithRazorpay,
+  addressJson, cartJson, notifyOrder, markOrderPaid, ordersJson, productJson, razorpayKeyId, rzp, syncOrderWithRazorpay,
   variantsByProduct, verifyPaymentSignature, verifyWebhookSignature, wishlistId, wishlistJson,
 } from "./shop.ts";
 import { adminRoutes } from "./admin.ts";
@@ -519,7 +519,7 @@ route("/payment/verify", { POST: async ({ user, body }) => {
 
   if ("failed" in result) return json({ error: "Payment verification failed" }, 400);
   if ("already" in result) return json({ message: "Payment already verified", order_id: result.already });
-  if (result.newlyPaid) await emailOrder(result.orderId!);
+  if (result.newlyPaid) await notifyOrder(result.orderId!);
   return json({ message: "Payment verified successfully", order_id: result.orderId });
 } });
 
@@ -559,7 +559,7 @@ route("/payment/webhook", { POST: async ({ req }) => {
     return { status: "order_created", order_id: newId, newlyPaid: true };
   });
   const { newlyPaid, ...out } = result as any;
-  if (out.order_id && newlyPaid) await emailOrder(out.order_id);
+  if (out.order_id && newlyPaid) await notifyOrder(out.order_id);
   return json(out);
 } }, { noAuth: true });
 

@@ -2,6 +2,7 @@
 import { sql, iso, money, paise } from "./db.ts";
 import { img } from "./util.ts";
 import { sendOrderSuccessEmail } from "./email.ts";
+import { adminNumbers, sendTemplate, WA, whatsappConfigured } from "./whatsapp.ts";
 
 // ------------------------------------------------------------------ Razorpay REST client
 const RZP_ID = Deno.env.get("RAZORPAY_KEY_ID") ?? "";
@@ -180,19 +181,68 @@ export async function ordersJson(orders: any[], list: boolean) {
 type OrderRow = { id: number; user_id: number };
 
 /** Load what the confirmation email needs, then send it (never throws). */
-export async function emailOrder(orderId: number) {
+export async function emailOrder(orderId: number): Promise<{ ok: boolean; error?: string }> {
   try {
     const [o] = await sql`select o.*, u.username, u.email, u.first_name, u.last_name from app_order o
                           join auth_user u on u.id = o.user_id where o.id = ${orderId}`;
-    if (!o) return;
+    if (!o) return { ok: false, error: "Order not found" };
     const [addr] = o.shipping_address_id ? await sql`select * from app_address where id = ${o.shipping_address_id}` : [null];
     const items = await sql`select p.title, v.quantity_label, oi.quantity, oi.total_price from app_orderitem oi
                             join app_productvariant v on v.id = oi.variant_id join app_product p on p.id = v.product_id
                             where oi.order_id = ${orderId} order by oi.id`;
-    await sendOrderSuccessEmail(o as any, o as any, addr, items as any);
+    return await sendOrderSuccessEmail(o as any, o as any, addr, items as any);
   } catch (e) {
     console.error(`Order confirmation email failed for order #${orderId}:`, e);
+    return { ok: false, error: String(e) };
   }
+}
+
+async function orderForMessages(orderId: number) {
+  const [o] = await sql`select o.*, u.username, u.email, u.first_name, u.last_name from app_order o
+                        join auth_user u on u.id = o.user_id where o.id = ${orderId}`;
+  if (!o) return null;
+  const [addr] = o.shipping_address_id ? await sql`select * from app_address where id = ${o.shipping_address_id}` : [null];
+  const items = await sql`select p.title, v.quantity_label, oi.quantity from app_orderitem oi
+                          join app_productvariant v on v.id = oi.variant_id join app_product p on p.id = v.product_id
+                          where oi.order_id = ${orderId} order by oi.id`;
+  const name = (`${o.first_name ?? ""} ${o.last_name ?? ""}`.trim() || o.username) as string;
+  const summary = items.map((i: any) => `${i.title} (${i.quantity_label}) x${i.quantity}`).join(", ");
+  const amount = Number(o.total_amount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return { o, addr, name, summary, amount, phone: addr?.phone as string | undefined, city: (addr?.city ?? "") as string };
+}
+
+/** WhatsApp the customer and the shop staff about a newly paid order (never throws). */
+export async function whatsappOrder(orderId: number) {
+  if (!whatsappConfigured()) return;
+  try {
+    const m = await orderForMessages(orderId);
+    if (!m) return;
+    await Promise.all([
+      // Customer: Hi {{1}}, your Jaji's order #{{2}} of Rs {{3}} is confirmed. Items: {{4}}
+      m.phone ? sendTemplate(m.phone, WA.order, [m.name, m.o.id, m.amount, m.summary]) : null,
+      // Staff: New order #{{1}} - Rs {{2}} from {{3}} ({{4}}, {{5}}). Items: {{6}}
+      ...adminNumbers().map((n) => sendTemplate(n, WA.admin, [m.o.id, m.amount, m.name, m.phone ?? "-", m.city || "-", m.summary])),
+    ]);
+  } catch (e) {
+    console.error(`WhatsApp alert failed for order #${orderId}:`, e);
+  }
+}
+
+/** WhatsApp the customer that the order has shipped (never throws). */
+export async function whatsappShipped(orderId: number) {
+  if (!whatsappConfigured()) return;
+  try {
+    const m = await orderForMessages(orderId);
+    // Hi {{1}}, your Jaji's order #{{2}} has been shipped.
+    if (m?.phone) await sendTemplate(m.phone, WA.shipped, [m.name, m.o.id]);
+  } catch (e) {
+    console.error(`WhatsApp shipped message failed for order #${orderId}:`, e);
+  }
+}
+
+/** Everything that should happen once an order becomes paid. */
+export async function notifyOrder(orderId: number) {
+  await Promise.all([emailOrder(orderId), whatsappOrder(orderId)]);
 }
 
 /**
@@ -232,7 +282,7 @@ export async function syncOrderWithRazorpay(order: { id: number; payment_status:
     for (const p of data.items ?? []) {
       if (p.status === "captured" || p.captured === true) {
         const done = await sql.begin((tx) => markOrderPaid(tx as any, order.id, p.id, rzpOrderId));
-        if (done) await emailOrder(order.id);
+        if (done) await notifyOrder(order.id);
         return true;
       }
     }

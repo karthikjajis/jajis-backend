@@ -5,25 +5,49 @@ const BREVO_API_KEY = Deno.env.get("BREVO_API_KEY") ?? "";
 const FROM = Deno.env.get("DEFAULT_FROM_EMAIL") ?? "";
 const ADMIN_EMAIL = Deno.env.get("ADMIN_NOTIFY_EMAIL") ?? "managingdirector@jajis.in";
 
-async function send(to: string[], subject: string, text: string, html: string) {
+export type MailResult = { ok: boolean; status?: number; error?: string };
+
+async function send(to: string[], subject: string, text: string, html: string): Promise<MailResult> {
   if (!BREVO_API_KEY || !FROM) {
     console.error("Email not sent (BREVO_API_KEY / DEFAULT_FROM_EMAIL missing):", subject);
-    return;
+    return { ok: false, error: "Email is not set up (BREVO_API_KEY / DEFAULT_FROM_EMAIL missing)." };
   }
   try {
     const r = await fetch(Deno.env.get("BREVO_API_URL") ?? "https://api.brevo.com/v3/smtp/email", {
       method: "POST",
       headers: { "Accept": "application/json", "Content-Type": "application/json", "api-key": BREVO_API_KEY },
       body: JSON.stringify({
-        sender: { name: FROM.split("@")[0], email: FROM },
+        sender: { name: Deno.env.get("EMAIL_SENDER_NAME") ?? "Jaji's", email: FROM },
         to: to.filter(Boolean).map((email) => ({ email })),
         subject, textContent: text, htmlContent: html,
       }),
     });
-    if (!r.ok) console.error(`Brevo API error: ${r.status} - ${await r.text()}`);
+    if (!r.ok) {
+      const body = await r.text();
+      console.error(`Brevo API error: ${r.status} - ${body}`);
+      let error = body;
+      try { error = JSON.parse(body).message ?? body; } catch { /* plain text */ }
+      if (/unrecognised IP/i.test(error)) {
+        error = "Brevo blocked the server's IP address. In Brevo go to Security → Authorised IPs and deactivate IP blocking.";
+      }
+      return { ok: false, status: r.status, error };
+    }
+    return { ok: true, status: r.status };
   } catch (e) {
     console.error("Failed to send email via Brevo:", e);
+    return { ok: false, error: String(e) };
   }
+}
+
+export const emailStatus = () => ({ configured: Boolean(BREVO_API_KEY && FROM), from: FROM, admin: ADMIN_EMAIL });
+
+export function sendTestEmail(to: string) {
+  const when = new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
+  return send([to], "Test email from jajisinnovation.com",
+    `This is a test email from your website (${when}). If you can read this, order and enquiry emails are working.`,
+    `<div style="font-family:Arial,sans-serif;font-size:15px;color:#111"><h2 style="margin:0 0 8px">Emails are working ✓</h2>
+     <p>This is a test email from jajisinnovation.com, sent ${when}.</p>
+     <p>Order confirmations, password reset codes, event hall and franchise enquiry emails all use this same sender.</p></div>`);
 }
 
 const shell = (title: string, inner: string, width = 600) => `
@@ -134,7 +158,7 @@ Thank you for shopping with us.
                 </p>
             </td>
         </tr>`);
-  await send([user.email, FROM], `Order Confirmation – Order #${order.id}`, text, html);
+  return send([user.email, FROM], `Order Confirmation – Order #${order.id}`, text, html);
 }
 
 // ------------------------------------------------------------------ password reset OTP
