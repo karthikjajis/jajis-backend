@@ -402,7 +402,7 @@ async function notificationsPage() {
       <p class="mute">Staff alert numbers: <b>${x.whatsapp.admin_numbers.length ? x.whatsapp.admin_numbers.map(esc).join(", ") : "none"}</b><br>
       Templates: ${esc(x.whatsapp.templates.order)} · ${esc(x.whatsapp.templates.admin)} · ${esc(x.whatsapp.templates.shipped)}</p>
       <div class="f"><label>Send a test WhatsApp to (mobile number)</label><input id="tw" placeholder="98765 43210" style="width:100%"></div>
-      <div class="f" style="margin-top:8px"><label>Template</label><input id="twt" value="hello_world" style="width:100%"></div>
+      <div class="f" style="margin-top:8px"><label>Template</label><input id="twt" value="order_confirmation" style="width:100%"></div>
       <button class="btn" id="twb" style="margin-top:10px" ${x.whatsapp.configured ? "" : "disabled"}>Send test WhatsApp</button><p id="twr" class="mute" style="margin-top:10px"></p></div>
   </div>`;
   const run = async (b, out, path, body) => {

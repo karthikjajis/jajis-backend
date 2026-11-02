@@ -360,8 +360,16 @@ export function adminRoutes(route: RouteFn) {
     staff(user);
     const d = await body();
     // Meta's ready-made "hello_world" template works before your own templates are approved.
-    const template = String(d.template || "hello_world");
-    const r = await sendTemplate(String(d.to ?? ""), template, Array.isArray(d.params) ? d.params : []);
+    const template = String(d.template || "hello_world").trim();
+    // Sample values so each of our templates can be tested on its own.
+    const SAMPLES: Record<string, unknown[]> = {
+      [WA.order]: ["Test Customer", "0000", "1.00", "Test product (100 ml) x1"],
+      [WA.admin]: ["0000", "1.00", "Test Customer", "9999999999", "Kollam", "Test product (100 ml) x1"],
+      [WA.shipped]: ["Test Customer", "0000"],
+    };
+    const params = Array.isArray(d.params) && d.params.length ? d.params : (SAMPLES[template] ?? []);
+    // Meta's ready-made hello_world template exists only in US English.
+    const r = await sendTemplate(String(d.to ?? ""), template, params, template === "hello_world" ? "en_US" : undefined);
     return json({ ...r, message: r.ok ? "WhatsApp message sent." : `WhatsApp failed: ${r.error}` });
   } });
 

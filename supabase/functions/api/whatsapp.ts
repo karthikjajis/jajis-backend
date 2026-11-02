@@ -38,7 +38,7 @@ const clean = (v: unknown) => String(v ?? "-").replace(/[\n\r\t]+/g, " ").replac
 
 export type WaResult = { ok: boolean; status?: number; error?: string; id?: string };
 
-export async function sendTemplate(to: string | null | undefined, template: string, params: unknown[]): Promise<WaResult> {
+export async function sendTemplate(to: string | null | undefined, template: string, params: unknown[], lang = LANG): Promise<WaResult> {
   if (!whatsappConfigured()) return { ok: false, error: "WhatsApp is not set up yet (WHATSAPP_TOKEN / WHATSAPP_PHONE_NUMBER_ID missing)." };
   const num = normalisePhone(to);
   if (!num) return { ok: false, error: `Not a valid phone number: ${to ?? "(none)"}` };
@@ -49,7 +49,7 @@ export async function sendTemplate(to: string | null | undefined, template: stri
       body: JSON.stringify({
         messaging_product: "whatsapp", to: num, type: "template",
         template: {
-          name: template, language: { code: LANG },
+          name: template, language: { code: lang },
           ...(params.length ? { components: [{ type: "body", parameters: params.map((p) => ({ type: "text", text: clean(p) })) }] } : {}),
         },
       }),
