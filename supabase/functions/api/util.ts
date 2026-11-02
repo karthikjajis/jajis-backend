@@ -173,3 +173,10 @@ export function todayIST(): string {
   const d = new Date(Date.now() + 330 * 60_000);
   return d.toISOString().slice(0, 10);
 }
+
+/** Run work after the response is sent (Supabase EdgeRuntime.waitUntil), so customers never wait for it. */
+export function background(p: Promise<unknown>) {
+  const done = p.catch((e) => console.error("Background task failed:", e));
+  const rt = (globalThis as any).EdgeRuntime;
+  if (rt?.waitUntil) rt.waitUntil(done);
+}

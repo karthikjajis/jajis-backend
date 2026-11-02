@@ -1,6 +1,6 @@
 // Shop serializers + Razorpay order/payment logic (ported from app/views.py & serializers.py).
 import { sql, iso, money, paise } from "./db.ts";
-import { img } from "./util.ts";
+import { background, img } from "./util.ts";
 import { sendOrderSuccessEmail } from "./email.ts";
 import { adminNumbers, sendTemplate, WA, whatsappConfigured } from "./whatsapp.ts";
 
@@ -282,7 +282,7 @@ export async function syncOrderWithRazorpay(order: { id: number; payment_status:
     for (const p of data.items ?? []) {
       if (p.status === "captured" || p.captured === true) {
         const done = await sql.begin((tx) => markOrderPaid(tx as any, order.id, p.id, rzpOrderId));
-        if (done) await notifyOrder(order.id);
+        if (done) background(notifyOrder(order.id));
         return true;
       }
     }

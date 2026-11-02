@@ -2,7 +2,7 @@
 // Same URLs (/api/...), same JSON responses, same token login, same Razorpay + Brevo behaviour.
 import { sql, iso, money, paise } from "./db.ts";
 import {
-  authenticate, bad, checkPassword, corsHeaders, EMAIL_RE, HttpError, img, json, makePassword, newTokenKey,
+  authenticate, background, bad, checkPassword, corsHeaders, EMAIL_RE, HttpError, img, json, makePassword, newTokenKey,
   notFound, randomDigits, readBody, requireUser, todayIST, toInt, type User,
 } from "./util.ts";
 import { validate } from "./validate.ts";
@@ -367,10 +367,18 @@ route("/wishlist/toggle", { POST: async ({ user, body }) => {
 const ADDRESS = {
   label: { type: "str", max: 100, blank: true, nullable: true }, line1: { type: "str", max: 255, required: true },
   line2: { type: "str", max: 255, blank: true, nullable: true }, city: { type: "str", max: 100, required: true },
-  state: { type: "str", max: 100, blank: true, nullable: true }, postal_code: { type: "str", max: 20, required: true },
-  country: { type: "str", max: 100 }, phone: { type: "str", max: 30, blank: true, nullable: true },
+  state: { type: "str", max: 100, required: true }, postal_code: { type: "str", max: 20, required: true },
+  country: { type: "str", max: 100 }, phone: { type: "str", max: 30, required: true },
   is_default: { type: "bool" },
 } as const;
+
+/** Mobile number is mandatory on addresses: 10 digits, Indian mobile (6-9…). Stores the 10 digits. */
+function checkPhone(d: Record<string, any>, partial: boolean) {
+  if (partial && d.phone === undefined) return d;
+  const digits = String(d.phone ?? "").replace(/\D/g, "").replace(/^(91|0)(?=\d{10}$)/, "");
+  if (!/^[6-9]\d{9}$/.test(digits)) throw bad({ phone: ["Enter a valid 10-digit mobile number."] });
+  return { ...d, phone: digits };
+}
 
 route("/addresses", {
   GET: async ({ user }) => {
@@ -379,7 +387,7 @@ route("/addresses", {
   },
   POST: async ({ user, body }) => {
     const u = requireUser(user);
-    const d = validate(await body(), ADDRESS as any);
+    const d = checkPhone(validate(await body(), ADDRESS as any), false);
     const row = { label: null, line2: null, state: null, phone: null, country: "India", is_default: false, ...d };
     const [a] = await sql.begin(async (tx) => {
       if (row.is_default) await tx`update app_address set is_default = false where user_id = ${u.id} and is_default`;
@@ -396,7 +404,7 @@ async function ownAddress(u: User, id: string) {
 }
 async function updateAddress(u: User, id: string, data: Record<string, any>, partial: boolean) {
   const a = await ownAddress(u, id);
-  const d = validate(data, ADDRESS as any, partial);
+  const d = checkPhone(validate(data, ADDRESS as any, partial), partial);
   const [row] = await sql.begin(async (tx) => {
     if (d.is_default) await tx`update app_address set is_default = false where user_id = ${u.id} and is_default and id <> ${a.id}`;
     return Object.keys(d).length ? tx`update app_address set ${sql(d)} where id = ${a.id} returning *` : [a];
@@ -429,6 +437,9 @@ route("/payment/create", { POST: async ({ user, body }) => {
   let shipping = await pick(d.shipping_address_id);
   if (!shipping) [shipping] = await sql`select * from app_address where user_id = ${u.id} order by is_default desc, id desc limit 1`;
   if (!shipping) return json({ error: "Please provide a valid shipping address" }, 400);
+  if (!/^[6-9]\d{9}$/.test(String(shipping.phone ?? "").replace(/\D/g, "").replace(/^(91|0)(?=\d{10}$)/, ""))) {
+    return json({ error: "Please add a 10-digit mobile number to your delivery address." }, 400);
+  }
   const billing = (await pick(d.billing_address_id)) ?? shipping;
 
   const cartId = await cartIdFor(u.id);
@@ -519,7 +530,7 @@ route("/payment/verify", { POST: async ({ user, body }) => {
 
   if ("failed" in result) return json({ error: "Payment verification failed" }, 400);
   if ("already" in result) return json({ message: "Payment already verified", order_id: result.already });
-  if (result.newlyPaid) await notifyOrder(result.orderId!);
+  if (result.newlyPaid) background(notifyOrder(result.orderId!));
   return json({ message: "Payment verified successfully", order_id: result.orderId });
 } });
 
@@ -559,7 +570,7 @@ route("/payment/webhook", { POST: async ({ req }) => {
     return { status: "order_created", order_id: newId, newlyPaid: true };
   });
   const { newlyPaid, ...out } = result as any;
-  if (out.order_id && newlyPaid) await notifyOrder(out.order_id);
+  if (out.order_id && newlyPaid) background(notifyOrder(out.order_id));
   return json(out);
 } }, { noAuth: true });
 
