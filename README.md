@@ -37,3 +37,10 @@ supabase functions deploy api --no-verify-jwt
 - `email.ts` – email templates (Brevo)
 - `util.ts`, `db.ts`, `validate.ts` – helpers, CORS, token auth, Django-compatible password hashing
 - `supabase/migrations/` – extra table for OTP brute-force protection
+
+## WhatsApp order alerts (Meta WhatsApp Cloud API)
+Off until these Supabase secrets exist: `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_ADMIN_NUMBERS` (comma-separated).
+Optional: `WHATSAPP_ORDER_TEMPLATE` (order_confirmation), `WHATSAPP_ADMIN_TEMPLATE` (new_order_alert), `WHATSAPP_SHIPPED_TEMPLATE` (order_shipped), `WHATSAPP_TEMPLATE_LANG` (en).
+Sent when an order becomes paid (customer + staff) and when staff mark it shipped. Test from Admin → Email & WhatsApp.
+
+Deploy note: the live `api` function is a one-line entry that imports `supabase/functions/api/index.ts` from a pinned commit on GitHub; to ship a change, push and redeploy with the new commit hash.
