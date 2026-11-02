@@ -12,6 +12,7 @@ import {
   shippingFor, shippingRules, variantJson, variantsByProduct, verifyPaymentSignature, verifyWebhookSignature, wishlistId, wishlistJson,
 } from "./shop.ts";
 import { adminRoutes } from "./admin.ts";
+import { staffRoutes } from "./staff.ts";
 
 type Ctx = { req: Request; user: User | null; params: Record<string, string>; body: () => Promise<Record<string, any>> };
 type Handler = (c: Ctx) => Promise<Response> | Response;
@@ -688,6 +689,7 @@ route("/orders/:id", { GET: async ({ user, params }) => {
 
 // =============================================================== admin panel API
 adminRoutes(route);
+staffRoutes(route);
 
 // =============================================================== server
 Deno.serve(async (req) => {

@@ -586,8 +586,47 @@ async function customersPage() {
 }
 
 // ===================================================================== shell + routing
+// ===================================================================== order-desk staff logins
+async function staffLoginsPage() {
+  const desk = location.origin + "/staff.html";
+  view(`<h1>Staff logins</h1><p class="sub">Order-desk accounts can only see paid orders and update their status — no products, customers, payments or settings.<br>
+    Staff link: <a href="${esc(desk)}" target="_blank" rel="noopener"><b>${esc(desk)}</b></a></p>
+    <div class="two"><div class="card" style="padding:20px"><h3>Add a staff login</h3>
+      <form id="sf">
+        <div class="f"><label for="sn">Name</label><input id="sn" placeholder="e.g. Anu (packing)" style="width:100%"></div>
+        <div class="f" style="margin-top:8px"><label for="su">Username</label><input id="su" required autocapitalize="off" style="width:100%"></div>
+        <div class="f" style="margin-top:8px"><label for="sp">Password (8+ characters)</label><input id="sp" required minlength="8" style="width:100%"></div>
+        <button class="btn" style="margin-top:12px">Create login</button>
+      </form></div>
+    <div class="card"><h3 style="padding:16px 16px 0">Current logins</h3><div id="sl"><div class="empty">Loading…</div></div></div></div>`);
+  const load = async () => {
+    const rows = await api("/admin/order-staff");
+    $("#sl").innerHTML = rows.length ? `<table>${rows.map((r) => `<tr><td><b>${esc(r.username)}</b><div class="mute">${esc(r.first_name || "")}</div></td>
+      <td>${r.is_active ? badge("active", "b-green") : badge("disabled", "b-gray")}<div class="mute">${r.updates} updates · last in ${dt(r.last_login)}</div></td>
+      <td class="right"><button class="btn ghost sm" data-pw="${r.id}">New password</button>
+      <button class="btn ${r.is_active ? "red" : "ghost"} sm" data-act="${r.id}" data-on="${r.is_active ? 0 : 1}">${r.is_active ? "Disable" : "Enable"}</button></td></tr>`).join("")}</table>`
+      : '<div class="empty">No staff logins yet.</div>';
+    $("#sl").querySelectorAll("[data-pw]").forEach((b) => b.onclick = async () => {
+      const pw = prompt("New password (8+ characters):"); if (!pw) return;
+      try { toast((await api("/admin/order-staff/" + b.dataset.pw, { method: "PATCH", body: { password: pw } })).message); } catch (e) { toast(e.message, true); }
+    });
+    $("#sl").querySelectorAll("[data-act]").forEach((b) => b.onclick = async () => {
+      try { await api("/admin/order-staff/" + b.dataset.act, { method: "PATCH", body: { is_active: b.dataset.on === "1" } }); load(); } catch (e) { toast(e.message, true); }
+    });
+  };
+  $("#sf").onsubmit = async (e) => {
+    e.preventDefault(); const b = e.target.querySelector("button"); b.disabled = true;
+    try {
+      toast((await api("/admin/order-staff", { method: "POST", body: { name: $("#sn").value, username: $("#su").value, password: $("#sp").value } })).message);
+      e.target.reset(); load();
+    } catch (err) { toast(err.message, true); }
+    b.disabled = false;
+  };
+  load();
+}
+
 const PAGES = [
-  ["Overview", [["dashboard", "Dashboard", dashboard], ["notifications", "Email & WhatsApp", notificationsPage]]],
+  ["Overview", [["dashboard", "Dashboard", dashboard], ["notifications", "Email & WhatsApp", notificationsPage], ["staff", "Staff logins", staffLoginsPage]]],
   ["Shop", [["orders", "Orders", ordersPage], ["products", "Products", productsPage], ["categories", "Categories", () => resourcePage("categories")],
     ["payments", "Payments", paymentsPage], ["shipping", "Shipping charges", () => resourcePage("shipping")], ["customers", "Customers", customersPage]]],
   ["Leads", [["eventhall", "Event hall bookings", () => resourcePage("eventhall")], ["franchise", "Franchise enquiries", franchisePage]]],

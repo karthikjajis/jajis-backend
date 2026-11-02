@@ -318,6 +318,10 @@ export function adminRoutes(route: RouteFn) {
       const [before] = await sql`select status from app_order where id = ${id(params.id)}`;
       const [row] = await sql`update app_order set ${sql(set)} where id = ${id(params.id)} returning *`;
       if (!row) throw notFound();
+      if (set.status && set.status !== before?.status) {
+        await sql`insert into api_order_status_log (order_id, from_status, to_status, note, user_id)
+                  values (${row.id}, ${before?.status ?? null}, ${set.status}, 'Changed in admin panel', ${user!.id})`;
+      }
       if (set.status === "shipped" && before?.status !== "shipped") await whatsappShipped(row.id);
       return json(rowOut(row));
     },

@@ -50,3 +50,9 @@ Shoppers without an account keep their cart in the browser (`/variants/lookup` r
 with name, email, mobile, address and items. The server creates a private `guest_…` user (unusable password), its address and
 cart, and returns the Razorpay payload plus a guest token; the normal `/payment/verify`, emails, WhatsApp and admin flows then apply.
 Guest records don't block sign-up or password reset for the same email. Admin shows them as "guest".
+
+## Order desk (staff link)
+`admin/staff.html` → https://jajis-admin.vercel.app/staff.html. Order-desk logins (table `api_order_staff`, created in
+Admin → Staff logins) can only list paid orders, open one, and move it New → Packing → Shipped → Delivered (`/staff/*` routes in
+`staff.ts`). Every change is logged in `api_order_status_log` with who did it and an optional note (courier / tracking no.).
+Shipped sends the customer the `order_shipped` WhatsApp. Admin accounts can use the desk too.

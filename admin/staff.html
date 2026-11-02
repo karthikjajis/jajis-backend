@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#111111">
+<title>Jaji's Order Desk</title>
+<link rel="icon" href="logo.png">
+<link rel="apple-touch-icon" href="logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#111;--ink2:#444;--mute:#6b6b6b;--line:#e5e5e2;--bg:#f6f6f4;--card:#fff;--green:#16803c;--red:#c62828;--amber:#9a5b00;--blue:#1d4ed8;--gold:#8a6a35}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.45 Inter,system-ui,sans-serif;color:var(--ink);background:var(--bg);-webkit-text-size-adjust:100%}
+button,input,textarea{font:inherit;color:inherit}
+.hide{display:none!important}
+header{position:sticky;top:0;z-index:5;background:#111;color:#fff;padding:12px 16px calc(12px) 16px;display:flex;align-items:center;gap:12px}
+header img{height:30px;filter:invert(1)}
+header .t{font-weight:600;letter-spacing:.04em}
+header .me{margin-left:auto;font-size:13px;color:#cfcfcf;display:flex;gap:10px;align-items:center}
+header button{background:none;border:1px solid #555;color:#fff;border-radius:8px;padding:6px 10px;cursor:pointer}
+main{max-width:760px;margin:0 auto;padding:14px 14px 90px}
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px}
+.tabs button{border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px 4px;font-weight:600;font-size:13px;cursor:pointer;min-height:48px}
+.tabs button.on{background:#111;color:#fff;border-color:#111}
+.tabs .n{display:block;font-size:12px;font-weight:500;opacity:.75}
+.search{display:flex;gap:8px;margin-bottom:12px}
+.search input{flex:1;border:1px solid var(--line);border-radius:10px;padding:12px;background:#fff;min-height:48px}
+.search button{border:1px solid var(--line);background:#fff;border-radius:10px;padding:0 14px;cursor:pointer}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px}
+.order{display:block;width:100%;text-align:left;padding:14px;margin-bottom:10px;cursor:pointer;border:1px solid var(--line);background:#fff;border-radius:12px}
+.order:active{background:#fafafa}
+.row{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.mute{color:var(--mute);font-size:13px}
+.badge{display:inline-block;font-size:12px;font-weight:600;padding:3px 9px;border-radius:20px;white-space:nowrap}
+.s-confirmed{background:#e8efff;color:var(--blue)}.s-processing{background:#fff1dc;color:var(--amber)}
+.s-shipped{background:#efe8ff;color:#5b21b6}.s-delivered{background:#e6f4ea;color:var(--green)}
+.s-cancelled,.s-refunded{background:#eee;color:#555}
+.empty{text-align:center;color:var(--mute);padding:40px 10px}
+/* order detail */
+.back{border:none;background:none;padding:6px 0;margin-bottom:6px;cursor:pointer;font-weight:600}
+.sec{padding:14px;border-bottom:1px solid var(--line)}
+.sec:last-child{border-bottom:none}
+.sec h3{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute)}
+.item{display:flex;justify-content:space-between;gap:10px;padding:6px 0}
+.qty{font-weight:700;min-width:36px}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.btn{border:1px solid #111;background:#111;color:#fff;border-radius:10px;padding:12px;font-weight:600;cursor:pointer;min-height:48px;text-align:center;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+.btn.ghost{background:#fff;color:#111;border-color:var(--line)}
+.btn:disabled{opacity:.5;cursor:wait}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.steps button{border:1px solid var(--line);background:#fff;border-radius:10px;padding:12px 4px;font-weight:600;font-size:13px;cursor:pointer;min-height:52px}
+.steps button.cur{background:#111;color:#fff;border-color:#111}
+.steps button:disabled{cursor:default}
+textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;min-height:64px;resize:vertical}
+label{display:block;font-size:13px;font-weight:600;margin:12px 0 6px}
+.hist{font-size:13px;padding:6px 0;border-top:1px dashed var(--line)}
+.hist:first-child{border-top:none}
+/* login */
+.login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.login form{width:100%;max-width:360px;padding:28px}
+.login img{display:block;width:110px;margin:0 auto 6px}
+.login p{text-align:center;color:var(--mute);margin:0 0 18px}
+.login input{width:100%;border:1px solid var(--line);border-radius:10px;padding:12px;min-height:48px;margin-top:4px}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#111;color:#fff;padding:12px 18px;border-radius:10px;z-index:20;max-width:90vw;text-align:center}
+#toast.bad{background:var(--red)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<div id="toast" class="hide" role="status" aria-live="polite"></div>
+<script>
+const API = localStorage.getItem("jaji_admin_api") || "https://tbkvtcuqszgmahzswspe.supabase.co/functions/v1/api";
+const KEY = "jaji_staff_token";
+let TOKEN = localStorage.getItem(KEY);
+let ME = null, VIEW = "todo", TERM = "";
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const inr = (v) => "₹" + Number(v || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+const dt = (v) => v ? new Date(v).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
+const ago = (v) => { const m = Math.round((Date.now() - new Date(v)) / 60000); return m < 60 ? m + " min ago" : m < 1440 ? Math.round(m / 60) + " h ago" : Math.round(m / 1440) + " d ago"; };
+const STEPS = [["confirmed", "New"], ["processing", "Packing"], ["shipped", "Shipped"], ["delivered", "Delivered"]];
+const badge = (s, label) => `<span class="badge s-${esc(s)}">${esc(label)}</span>`;
+const digits = (p) => String(p || "").replace(/\D/g, "").replace(/^(91|0)(?=\d{10}$)/, "");
+
+function toast(msg, bad = false) {
+  const t = $("#toast"); t.textContent = msg; t.className = bad ? "bad" : ""; clearTimeout(t._h);
+  t._h = setTimeout(() => t.className = "hide", bad ? 6000 : 2600);
+}
+async function api(path, { method = "GET", body } = {}) {
+  const r = await fetch(API + path, { method, headers: { "Content-Type": "application/json", ...(TOKEN ? { Authorization: "Token " + TOKEN } : {}) }, body: body ? JSON.stringify(body) : undefined });
+  if (r.status === 401) { logout(); throw new Error("Please log in again."); }
+  const data = await r.json().catch(() => null);
+  if (!r.ok) throw new Error(data?.detail || data?.message || data?.error || "Something went wrong (" + r.status + ")");
+  return data;
+}
+function logout() { TOKEN = null; ME = null; localStorage.removeItem(KEY); loginScreen(); }
+
+function loginScreen() {
+  $("#root").innerHTML = `<div class="login"><form class="card" id="lf">
+    <img src="logo.png" alt="Jaji's"><p>Order desk</p>
+    <label for="u">Username</label><input id="u" autocomplete="username" autocapitalize="off" required>
+    <label for="p">Password</label><input id="p" type="password" autocomplete="current-password" required>
+    <button class="btn" style="width:100%;margin-top:16px">Sign in</button></form></div>`;
+  $("#lf").onsubmit = async (e) => {
+    e.preventDefault(); const b = e.target.querySelector("button"); b.disabled = true;
+    try {
+      const r = await api("/staff/login", { method: "POST", body: { username: $("#u").value, password: $("#p").value } });
+      TOKEN = r.token; localStorage.setItem(KEY, TOKEN); boot();
+    } catch (err) { toast(err.message, true); b.disabled = false; }
+  };
+}
+
+function shell() {
+  $("#root").innerHTML = `<header><img src="logo.png" alt=""><span class="t">Order desk</span>
+    <span class="me">${esc(ME.username)} <button id="out">Sign out</button></span></header><main id="page"></main>`;
+  $("#out").onclick = logout;
+}
+
+async function listPage() {
+  history.replaceState(null, "", "#");
+  $("#page").innerHTML = `
+    <div class="tabs" role="tablist">
+      ${[["todo", "To do"], ["shipped", "Shipped"], ["delivered", "Delivered"], ["all", "All"]].map(([k, l]) =>
+        `<button role="tab" data-v="${k}" class="${VIEW === k ? "on" : ""}" aria-selected="${VIEW === k}">${l}<span class="n" id="n-${k}"></span></button>`).join("")}
+    </div>
+    <form class="search" id="sf"><input id="q" type="search" placeholder="Order no., name or phone" value="${esc(TERM)}" aria-label="Search orders"><button>Search</button></form>
+    <div id="list"><div class="empty">Loading…</div></div>`;
+  $("#page").querySelectorAll("[data-v]").forEach((b) => b.onclick = () => { VIEW = b.dataset.v; listPage(); });
+  $("#sf").onsubmit = (e) => { e.preventDefault(); TERM = $("#q").value.trim(); listPage(); };
+  try {
+    const x = await api(`/staff/orders?view=${VIEW}${TERM ? "&q=" + encodeURIComponent(TERM) : ""}`);
+    $("#n-todo").textContent = (x.counts.new + x.counts.packing) || "";
+    $("#n-shipped").textContent = x.counts.shipped || "";
+    $("#list").innerHTML = x.orders.length ? x.orders.map((o) => `
+      <button class="order" data-id="${o.id}">
+        <div class="row"><b>#${o.id} · ${esc(o.customer)}</b>${badge(o.status, o.status_label)}</div>
+        <div class="row mute" style="margin-top:4px"><span>${o.pieces} item${o.pieces === 1 ? "" : "s"} · ${inr(o.total)}${o.place ? " · " + esc(o.place) : ""}</span><span>${ago(VIEW === "todo" ? o.created_at : o.updated_at)}</span></div>
+      </button>`).join("") : `<div class="empty">${VIEW === "todo" ? "Nothing to pack right now." : "No orders here."}</div>`;
+    $("#list").querySelectorAll("[data-id]").forEach((b) => b.onclick = () => orderPage(b.dataset.id));
+  } catch (err) { $("#list").innerHTML = `<div class="empty">${esc(err.message)}</div>`; }
+}
+
+async function orderPage(id) {
+  history.replaceState(null, "", "#order-" + id);
+  $("#page").innerHTML = `<button class="back" id="bk">← All orders</button><div id="od"><div class="empty">Loading…</div></div>`;
+  $("#bk").onclick = listPage;
+  let o;
+  try { o = await api("/staff/orders/" + id); } catch (err) { $("#od").innerHTML = `<div class="empty">${esc(err.message)}</div>`; return; }
+  const a = o.address || {};
+  const ph = digits(a.phone);
+  const locked = !STEPS.some(([s]) => s === o.status);
+  $("#od").innerHTML = `<div class="card">
+    <div class="sec"><div class="row"><h2 style="margin:0;font-size:20px">Order #${o.id}</h2>${badge(o.status, o.status_label)}</div>
+      <div class="mute" style="margin-top:4px">Paid ${dt(o.created_at)} · ${inr(o.total)}${Number(o.shipping_cost) > 0 ? " incl. " + inr(o.shipping_cost) + " shipping" : " · free shipping"}</div></div>
+    <div class="sec"><h3>Pack these</h3>${o.items.map((i) => `<div class="item"><span class="qty">${i.quantity} ×</span><span style="flex:1">${esc(i.title)}<div class="mute">${esc(i.variant)}${i.sku ? " · SKU " + esc(i.sku) : ""}</div></span></div>`).join("")}</div>
+    <div class="sec"><h3>Deliver to</h3>
+      <b>${esc(o.customer.name)}</b>${o.customer.guest ? ' <span class="mute">(no account)</span>' : ""}<br>
+      ${esc(a.line1)}${a.line2 ? ", " + esc(a.line2) : ""}<br>${esc(a.city)}, ${esc(a.state)} – <b>${esc(a.postal_code)}</b><br>
+      <span class="mute">${esc(a.phone)} · ${esc(o.customer.email)}</span>
+      <div class="actions">
+        ${ph ? `<a class="btn ghost" href="tel:+91${ph}">Call</a><a class="btn ghost" href="https://wa.me/91${ph}" target="_blank" rel="noopener">WhatsApp</a>` : ""}
+        <button class="btn ghost" id="copy" style="grid-column:1/-1">Copy address for courier</button>
+      </div></div>
+    <div class="sec"><h3>Update status</h3>
+      ${locked ? `<p class="mute">This order is ${esc(o.status)}. Only an admin can change it.</p>` : `
+      <div class="steps">${STEPS.map(([s, l]) => `<button data-s="${s}" class="${o.status === s ? "cur" : ""}" ${o.status === s ? "disabled" : ""}>${l}</button>`).join("")}</div>
+      <label for="note">Note (optional) — e.g. courier and tracking number</label>
+      <textarea id="note" maxlength="500" placeholder="DTDC · 1234567890"></textarea>
+      <p class="mute" style="margin:8px 0 0">Choosing <b>Shipped</b> sends the customer a WhatsApp message.</p>`}
+    </div>
+    <div class="sec"><h3>History</h3>${o.history.length ? o.history.map((h) => `<div class="hist">${dt(h.at)} — <b>${esc(h.to)}</b>${h.by ? " by " + esc(h.by) : ""}${h.note ? `<div class="mute">${esc(h.note)}</div>` : ""}</div>`).join("") : '<div class="mute">No changes yet.</div>'}</div>
+  </div>`;
+  $("#copy").onclick = async () => {
+    const txt = `${o.customer.name}\n${a.line1}${a.line2 ? ", " + a.line2 : ""}\n${a.city}, ${a.state} - ${a.postal_code}\nPhone: ${a.phone}\nOrder #${o.id}`;
+    try { await navigator.clipboard.writeText(txt); toast("Address copied"); } catch { toast("Couldn't copy — select it manually", true); }
+  };
+  $("#od").querySelectorAll("[data-s]").forEach((b) => b.onclick = async () => {
+    const label = b.textContent;
+    if (!confirm(`Mark order #${o.id} as ${label}?`)) return;
+    $("#od").querySelectorAll("[data-s]").forEach((x) => x.disabled = true);
+    try {
+      const r = await api(`/staff/orders/${o.id}/status`, { method: "POST", body: { status: b.dataset.s, note: $("#note").value } });
+      toast(r.message); orderPage(o.id);
+    } catch (err) { toast(err.message, true); orderPage(o.id); }
+  });
+}
+
+async function boot() {
+  if (!TOKEN) return loginScreen();
+  try { ME = await api("/staff/me"); } catch { return loginScreen(); }
+  shell();
+  const m = location.hash.match(/^#order-(\d+)$/);
+  m ? orderPage(m[1]) : listPage();
+}
+boot();
+</script>
+</body>
+</html>
