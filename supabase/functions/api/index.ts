@@ -9,7 +9,7 @@ import { validate } from "./validate.ts";
 import { sendEventHallEmails, sendFranchiseEmails, sendPasswordResetOtpEmail } from "./email.ts";
 import {
   addressJson, cartJson, notifyOrder, markOrderPaid, ordersJson, productJson, razorpayKeyId, rzp, syncOrderWithRazorpay,
-  variantJson, variantsByProduct, verifyPaymentSignature, verifyWebhookSignature, wishlistId, wishlistJson,
+  shippingFor, shippingRules, variantJson, variantsByProduct, verifyPaymentSignature, verifyWebhookSignature, wishlistId, wishlistJson,
 } from "./shop.ts";
 import { adminRoutes } from "./admin.ts";
 
@@ -512,7 +512,9 @@ async function startRazorpayOrder(userId: number, shipping: any, billing: any) {
   const items = await sql`select ci.quantity, v.id as variant_id, v.price from app_cartitem ci
                           join app_productvariant v on v.id = ci.variant_id where ci.cart_id = ${cartId} order by ci.id`;
   if (!items.length) return json({ error: "Cart is empty" }, 400);
-  const total = items.reduce((s, i) => s + i.quantity * paise(i.price), 0);
+  const subtotal = items.reduce((s, i) => s + i.quantity * paise(i.price), 0);
+  const ship = await shippingFor(shipping.state, shipping.city, subtotal); // city field holds the district
+  const total = subtotal + ship;
 
   let rzpOrder: any;
   try {
@@ -524,7 +526,7 @@ async function startRazorpayOrder(userId: number, shipping: any, billing: any) {
   const orderId = await sql.begin(async (tx) => {
     const [o] = await tx`insert into app_order (total_amount, shipping_cost, status, payment_method, payment_status, transaction_id,
                            created_at, updated_at, billing_address_id, shipping_address_id, user_id)
-                         values (${money(total)}, 0, 'pending', 'razorpay', 'unpaid', ${rzpOrder.id}, now(), now(),
+                         values (${money(total)}, ${money(ship)}, 'pending', 'razorpay', 'unpaid', ${rzpOrder.id}, now(), now(),
                            ${billing.id}, ${shipping.id}, ${u.id}) returning id`;
     for (const i of items) {
       await tx`insert into app_orderitem (quantity, unit_price, total_price, order_id, variant_id)
@@ -535,8 +537,17 @@ async function startRazorpayOrder(userId: number, shipping: any, billing: any) {
     return o.id as number;
   });
 
-  return { order_id: rzpOrder.id, db_order_id: orderId, amount: total / 100, currency: "INR", key: razorpayKeyId() };
+  return {
+    order_id: rzpOrder.id, db_order_id: orderId, amount: total / 100, currency: "INR", key: razorpayKeyId(),
+    subtotal: subtotal / 100, shipping: ship / 100,
+  };
 }
+
+// Shipping rates for the cart page (the server recalculates at payment, so this is display only).
+route("/shipping/rates", { GET: async () => {
+  const { rates, freeAbove } = await shippingRules();
+  return json({ free_above: freeAbove, rates });
+} });
 
 route("/payment/create", { POST: async ({ user, body }) => {
   const u = requireUser(user);

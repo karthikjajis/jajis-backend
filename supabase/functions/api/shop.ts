@@ -293,3 +293,36 @@ export async function syncOrderWithRazorpay(order: { id: number; payment_status:
 }
 
 export { money, paise };
+
+// ------------------------------------------------------------------ shipping (per order, by destination)
+type Rate = { state: string; district: string | null; amount: string };
+let rulesCache: { at: number; rates: Rate[]; freeAbove: number } | null = null;
+
+/** Shipping rates + free-shipping threshold (cached for 60 s; admin edits clear it). */
+export async function shippingRules() {
+  if (rulesCache && Date.now() - rulesCache.at < 60_000) return rulesCache;
+  const [rates, [s]] = await Promise.all([
+    sql`select state, district, amount from app_shipping_rate order by state, district nulls first`,
+    sql`select value from app_shop_setting where key = 'free_shipping_above'`,
+  ]);
+  const freeAbove = Number(s?.value ?? 1000);
+  rulesCache = { at: Date.now(), rates: rates as any, freeAbove: Number.isFinite(freeAbove) ? freeAbove : 1000 };
+  return rulesCache;
+}
+export const clearShippingCache = () => { rulesCache = null; };
+
+const norm = (v: unknown) => String(v ?? "").trim().toLowerCase();
+
+/**
+ * One charge per order: district rate, else state rate, else the "All India" rate.
+ * Free when the items total reaches the free-shipping amount. Works in paise.
+ */
+export async function shippingFor(state: unknown, district: unknown, subtotalPaise: number) {
+  const { rates, freeAbove } = await shippingRules();
+  if (subtotalPaise >= Math.round(freeAbove * 100)) return 0;
+  const st = norm(state), di = norm(district);
+  const hit = rates.find((r) => norm(r.state) === st && r.district && norm(r.district) === di)
+    ?? rates.find((r) => norm(r.state) === st && !r.district)
+    ?? rates.find((r) => norm(r.state) === "all india" && !r.district);
+  return hit ? paise(hit.amount) : 0;
+}

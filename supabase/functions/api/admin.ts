@@ -2,7 +2,7 @@
 // Every route needs a staff user's token (is_staff = true in auth_user).
 import { sql, iso, money, paise } from "./db.ts";
 import { bad, checkPassword, HttpError, img, json, newTokenKey, notFound, type User } from "./util.ts";
-import { emailOrder, ordersJson, syncOrderWithRazorpay, whatsappOrder, whatsappShipped } from "./shop.ts";
+import { clearShippingCache, emailOrder, ordersJson, syncOrderWithRazorpay, whatsappOrder, whatsappShipped } from "./shop.ts";
 import { emailStatus, sendTestEmail } from "./email.ts";
 import { adminNumbers, sendTemplate, WA, whatsappConfigured } from "./whatsapp.ts";
 
@@ -53,6 +53,10 @@ const RES: Record<string, Res> = {
       event_type: { t: "choice", req: true, choices: ["wedding", "reception", "birthday", "corporate", "other"] },
       category: { t: "choice", req: true, choices: ["ac", "non-ac"] },
     },
+  },
+  shipping: {
+    table: "app_shipping_rate", order: "state", search: ["state", "district"],
+    cols: { state: S(100), district: S(100, false), amount: { t: "money", req: true } },
   },
   franchise: { table: "app_franchiseenquiry", order: "created_at desc", created: "created_at", readOnly: true, cols: {}, search: ["full_name", "email", "mobile_number", "preferred_city"] },
 };
@@ -203,6 +207,7 @@ export function adminRoutes(route: RouteFn) {
     },
     POST: async ({ user, params, body }) => {
       staff(user);
+      if (params.res === "shipping") clearShippingCache();
       const r = RES[params.res]; if (!r || r.readOnly) throw notFound();
       const d = clean(r, await body(), false);
       if (r.created) d[r.created] = new Date().toISOString();
@@ -228,6 +233,7 @@ export function adminRoutes(route: RouteFn) {
     },
     PATCH: async ({ user, params, body }) => {
       staff(user);
+      if (params.res === "shipping") clearShippingCache();
       const r = RES[params.res]; if (!r || r.readOnly) throw notFound();
       const d = clean(r, await body(), true);
       if (r.updated) d[r.updated] = new Date().toISOString();
@@ -243,6 +249,7 @@ export function adminRoutes(route: RouteFn) {
     },
     DELETE: async ({ user, params }) => {
       staff(user);
+      if (params.res === "shipping") clearShippingCache();
       const r = RES[params.res]; if (!r) throw notFound();
       const rid = id(params.id);
       await sql.begin(async (tx) => {
@@ -337,6 +344,24 @@ export function adminRoutes(route: RouteFn) {
     await whatsappOrder(id(params.id));
     return json({ message: "WhatsApp messages sent." });
   } });
+
+  // ---------------- shop settings: free-shipping amount
+  route("/admin/settings/free-shipping", {
+    GET: async ({ user }) => {
+      staff(user);
+      const [r] = await sql`select value from app_shop_setting where key = 'free_shipping_above'`;
+      return json({ free_above: Number(r?.value ?? 1000) });
+    },
+    PUT: async ({ user, body }) => {
+      staff(user);
+      const v = Number((await body()).free_above);
+      if (!Number.isFinite(v) || v < 0 || v > 1_000_000) throw bad({ detail: "Enter an amount in rupees (0 = always free)." });
+      await sql`insert into app_shop_setting (key, value) values ('free_shipping_above', ${String(v)})
+                on conflict (key) do update set value = excluded.value`;
+      clearShippingCache();
+      return json({ free_above: v, message: "Saved" });
+    },
+  });
 
   // ---------------- notifications: status + test sends
   route("/admin/notifications", { GET: async ({ user }) => {

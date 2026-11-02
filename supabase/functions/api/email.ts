@@ -77,7 +77,7 @@ const row = (k: string, v: string, last = false, style = "") =>
 // ------------------------------------------------------------------ order confirmation
 export async function sendOrderSuccessEmail(
   user: { username: string; email: string; first_name?: string; last_name?: string },
-  order: { id: number; total_amount: string; transaction_id: string | null; payment_method: string | null },
+  order: { id: number; total_amount: string; shipping_cost?: string | null; transaction_id: string | null; payment_method: string | null },
   addr: Record<string, any> | null,
   items: { title: string; quantity_label: string; quantity: number; total_price: string }[],
 ) {
@@ -88,6 +88,7 @@ Hello ${name},
 Your payment was successful.
 
 Order ID: ${order.id}
+Shipping: ${Number(order.shipping_cost || 0) > 0 ? `₹${order.shipping_cost}` : "Free"}
 Total Amount: ₹${order.total_amount}
 
 Thank you for shopping with us.
@@ -119,6 +120,7 @@ Thank you for shopping with us.
                     <tr><td>Payment ID</td><td align="right">${esc(order.transaction_id)}</td></tr>
                     <tr><td>Payment Method</td><td align="right">${esc(order.payment_method)}</td></tr>
                     <tr><td>Status</td><td align="right" style="color:#16a34a;font-weight:bold;">Paid</td></tr>
+                    <tr><td>Shipping</td><td align="right">${Number(order.shipping_cost || 0) > 0 ? `₹${order.shipping_cost}` : "Free"}</td></tr>
                     <tr><td><strong>Total</strong></td><td align="right"><strong>₹${order.total_amount}</strong></td></tr>
                 </table>
             </td>
