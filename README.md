@@ -44,3 +44,9 @@ Optional: `WHATSAPP_ORDER_TEMPLATE` (order_confirmation), `WHATSAPP_ADMIN_TEMPLA
 Sent when an order becomes paid (customer + staff) and when staff mark it shipped. Test from Admin → Email & WhatsApp.
 
 Deploy note: the live `api` function is a one-line entry that imports `supabase/functions/api/index.ts` from a pinned commit on GitHub; to ship a change, push and redeploy with the new commit hash.
+
+## Express (guest) checkout
+Shoppers without an account keep their cart in the browser (`/variants/lookup` refreshes prices), then `POST /guest/checkout`
+with name, email, mobile, address and items. The server creates a private `guest_…` user (unusable password), its address and
+cart, and returns the Razorpay payload plus a guest token; the normal `/payment/verify`, emails, WhatsApp and admin flows then apply.
+Guest records don't block sign-up or password reset for the same email. Admin shows them as "guest".

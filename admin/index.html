@@ -145,6 +145,8 @@ function imgUrl(name, w) {
 }
 const STATUS_BADGE = { pending: "b-amber", confirmed: "b-blue", processing: "b-gold", shipped: "b-blue", delivered: "b-green", cancelled: "b-gray", refunded: "b-gray", failed: "b-red" };
 const badge = (s, cls) => `<span class="badge ${cls || STATUS_BADGE[s] || "b-gray"}">${esc(s)}</span>`;
+// Express-checkout customers have no account; show them as "Guest".
+const who = (u) => String(u || "").startsWith("guest_") ? `${badge("guest", "b-gray")}` : esc(u);
 const payBadge = (s) => badge(s, s === "paid" ? "b-green" : "b-red");
 
 // ===================================================================== image upload (Cloudinary, signed by our API)
@@ -315,7 +317,7 @@ async function dashboard() {
       <div class="card kpi"><div class="l">Leads</div><div class="v">${x.leads.franchise_30d + x.leads.upcoming_events}</div><div class="h">${x.leads.franchise_30d} franchise · ${x.leads.upcoming_events} upcoming events</div></div>
     </div>
     <div class="two">
-      <div class="card"><h3>Latest orders</h3><table>${x.recent_orders.map((o) => `<tr class="click" data-o="${o.id}"><td><b>#${o.id}</b></td><td>${esc(o.username)}</td>
+      <div class="card"><h3>Latest orders</h3><table>${x.recent_orders.map((o) => `<tr class="click" data-o="${o.id}"><td><b>#${o.id}</b></td><td>${who(o.username)}</td>
         <td>${inr(o.total_amount)}</td><td>${badge(o.status)}</td><td>${payBadge(o.payment_status)}</td><td class="mute">${dt(o.created_at)}</td></tr>`).join("")}</table></div>
       <div class="card"><h3>Low stock (5 or fewer)</h3>${x.low_stock.length ? `<table>${x.low_stock.map((v) => `<tr class="click" data-p="${v.product_id}"><td>${esc(v.title)}<div class="mute">${esc(v.quantity_label)}</div></td>
         <td class="right">${v.stock === 0 ? badge("out of stock", "b-red") : badge(v.stock + " left", "b-amber")}</td></tr>`).join("")}</table>` : '<div class="empty">All products are well stocked.</div>'}</div>
@@ -338,7 +340,7 @@ async function ordersPage() {
     const p = new URLSearchParams({ ...orderFilter, q: $("#q").value }); [...p.keys()].forEach((k) => !p.get(k) && p.delete(k));
     const rows = await api("/admin/orders?" + p);
     $("#list").innerHTML = rows.length ? `<table><tr><th>Order</th><th>Customer</th><th>Items</th><th class="right">Total</th><th>Status</th><th>Payment</th><th>Ship to</th><th>Placed</th></tr>
-      ${rows.map((o) => `<tr class="click" data-id="${o.id}"><td><b>#${o.id}</b></td><td>${esc(o.username)}<div class="mute">${esc(o.email)}</div></td>
+      ${rows.map((o) => `<tr class="click" data-id="${o.id}"><td><b>#${o.id}</b></td><td>${who(o.username)}<div class="mute">${esc(o.email)}</div></td>
         <td>${o.items_count}</td><td class="right">${inr(o.total_amount)}</td><td>${badge(o.status)}</td><td>${payBadge(o.payment_status)}</td>
         <td>${o.ship_city ? esc(o.ship_city) + " – " + esc(o.ship_pin) : "—"}</td><td class="mute">${dt(o.created_at)}</td></tr>`).join("")}</table>` : '<div class="empty">No orders match.</div>';
     $("#list").querySelectorAll("tr[data-id]").forEach((tr) => tr.onclick = () => orderDrawer(tr.dataset.id, load));
@@ -354,7 +356,7 @@ async function orderDrawer(id, onChange) {
   const o = await api("/admin/orders/" + id);
   const STAT = ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled", "refunded", "failed"];
   dr.innerHTML = `<button class="x">×</button><h2>Order #${o.id}</h2>
-    <div class="mute">${dt(o.created_at)} · ${esc(o.customer.username)} · <a href="mailto:${esc(o.customer.email)}">${esc(o.customer.email)}</a></div>
+    <div class="mute">${dt(o.created_at)} · ${o.customer.name ? esc(o.customer.name) + " · " : ""}${who(o.customer.username)} · <a href="mailto:${esc(o.customer.email)}">${esc(o.customer.email)}</a></div>
     <div class="bar" style="margin-top:16px">${badge(o.status)} ${payBadge(o.payment_status)}<div class="grow"></div>
       <select id="st" style="width:auto">${STAT.map((s) => `<option ${s === o.status ? "selected" : ""}>${s}</option>`).join("")}</select>
       <button class="btn sm" id="saveSt">Update status</button></div>
@@ -556,7 +558,7 @@ async function customersPage() {
   const load = async () => {
     const rows = await api("/admin/users" + ($("#q").value ? "?q=" + encodeURIComponent($("#q").value) : ""));
     $("#list").innerHTML = `<table><tr><th>Username</th><th>Email</th><th>Paid orders</th><th>Joined</th><th>Last login</th><th></th></tr>
-      ${rows.map((u) => `<tr><td><b>${esc(u.username)}</b></td><td>${esc(u.email)}</td><td>${u.paid_orders}</td><td class="mute">${dt(u.date_joined)}</td>
+      ${rows.map((u) => `<tr><td><b>${who(u.username)}</b>${u.first_name ? `<div class="mute">${esc((u.first_name + " " + (u.last_name || "")).trim())}</div>` : ""}</td><td>${esc(u.email)}</td><td>${u.paid_orders}</td><td class="mute">${dt(u.date_joined)}</td>
         <td class="mute">${dt(u.last_login)}</td><td>${u.is_staff ? badge("staff", "b-gold") : ""}${u.is_active ? "" : badge("disabled", "b-red")}</td></tr>`).join("")}</table>`;
   };
   let t; $("#q").oninput = () => { clearTimeout(t); t = setTimeout(load, 300); };

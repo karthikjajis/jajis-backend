@@ -9,7 +9,7 @@ import { validate } from "./validate.ts";
 import { sendEventHallEmails, sendFranchiseEmails, sendPasswordResetOtpEmail } from "./email.ts";
 import {
   addressJson, cartJson, notifyOrder, markOrderPaid, ordersJson, productJson, razorpayKeyId, rzp, syncOrderWithRazorpay,
-  variantsByProduct, verifyPaymentSignature, verifyWebhookSignature, wishlistId, wishlistJson,
+  variantJson, variantsByProduct, verifyPaymentSignature, verifyWebhookSignature, wishlistId, wishlistJson,
 } from "./shop.ts";
 import { adminRoutes } from "./admin.ts";
 
@@ -137,11 +137,12 @@ route("/signup", { POST: async ({ body }) => {
   if (data.username === undefined) errors.username = ["This field is required."];
   else if (!username) errors.username = ["This field may not be blank."];
   else if (username.length > 150) errors.username = ["Ensure this field has no more than 150 characters."];
+  else if (username.toLowerCase().startsWith("guest_")) errors.username = ["This username is reserved. Please choose another."];
   else if (!USERNAME_RE.test(username)) errors.username = ["Enter a valid username. This value may contain only letters, numbers, and @/./+/-/_ characters."];
   else if ((await sql`select 1 from auth_user where username = ${username}`).length) errors.username = ["A user with that username already exists."];
   if (email) {
     if (!EMAIL_RE.test(email) || email.length > 254) errors.email = ["Enter a valid email address."];
-    else if ((await sql`select 1 from auth_user where email = ${email}`).length) errors.email = ["Email already exists"];
+    else if ((await sql`select 1 from auth_user where email = ${email} and left(username, 6) <> 'guest_'`).length) errors.email = ["Email already exists"];
   }
   if (data.password === undefined) errors.password = ["This field is required."];
   else if (!password.trim()) errors.password = ["This field may not be blank."];
@@ -196,7 +197,7 @@ const emailOnly = (d: Record<string, any>) => {
 
 route("/forgot-password", { POST: async ({ body }) => {
   const email = emailOnly(await body());
-  const [u] = await sql`select id, username, email, first_name, last_name from auth_user where email = ${email} order by id limit 1`;
+  const [u] = await sql`select id, username, email, first_name, last_name from auth_user where email = ${email} and left(username, 6) <> 'guest_' order by id limit 1`;
   if (!u) return json({ message: "If the email exists, an OTP has been sent." });
   const otp = randomDigits(6);
   await sql`insert into app_passwordresetotp (email, otp, created_at, expires_at) values (${email}, ${otp}, now(), now() + interval '10 minutes')`;
@@ -232,7 +233,7 @@ route("/reset-password", { POST: async ({ body }) => {
     await sql`delete from app_passwordresetotp where id = ${row.id}`;
     throw bad({ message: "OTP has expired." });
   }
-  const [u] = await sql`select id from auth_user where email = ${email} order by id limit 1`;
+  const [u] = await sql`select id from auth_user where email = ${email} and left(username, 6) <> 'guest_' order by id limit 1`;
   if (!u) throw bad({ message: "User not found." });
   await sql`update auth_user set password = ${await makePassword(String(d.new_password))} where id = ${u.id}`;
   await sql`delete from app_passwordresetotp where id = ${row.id}`;
@@ -428,20 +429,85 @@ route("/addresses/:id", {
   },
 });
 
-// =============================================================== payments
-route("/payment/create", { POST: async ({ user, body }) => {
-  const u = requireUser(user);
-  const d = await body();
-  const pick = async (id: unknown) =>
-    id && /^\d+$/.test(String(id)) ? (await sql`select * from app_address where id = ${Number(id)} and user_id = ${u.id}`)[0] : undefined;
-  let shipping = await pick(d.shipping_address_id);
-  if (!shipping) [shipping] = await sql`select * from app_address where user_id = ${u.id} order by is_default desc, id desc limit 1`;
-  if (!shipping) return json({ error: "Please provide a valid shipping address" }, 400);
-  if (!/^[6-9]\d{9}$/.test(String(shipping.phone ?? "").replace(/\D/g, "").replace(/^(91|0)(?=\d{10}$)/, ""))) {
-    return json({ error: "Please add a 10-digit mobile number to your delivery address." }, 400);
-  }
-  const billing = (await pick(d.billing_address_id)) ?? shipping;
+// =============================================================== guest (express) checkout
+const GUEST_PREFIX = "guest_";
+const isGuest = (username: string | null | undefined) => String(username ?? "").startsWith(GUEST_PREFIX);
 
+// Fresh price/stock for a browser-side (guest) cart.
+route("/variants/lookup", { POST: async ({ body }) => {
+  const d = await body();
+  const ids = [...new Set((Array.isArray(d.ids) ? d.ids : []).map(Number).filter((n: number) => Number.isInteger(n) && n > 0))].slice(0, 100);
+  if (!ids.length) return json([]);
+  const rows = await sql`select v.id, v.quantity_label, v.mrp, v.price, v.stock, v.sku, v.product_id, p.title, p.brand, p.image1
+                         from app_productvariant v join app_product p on p.id = v.product_id where v.id in ${sql(ids)}`;
+  return json(rows.map(variantJson));
+} });
+
+/**
+ * Express checkout without an account: name, email, mobile, address and the browser cart.
+ * Creates (or reuses) a private guest record so payment, emails, WhatsApp and admin work as for members.
+ * Returns the Razorpay checkout payload plus a guest token that only gives access to this guest's own order.
+ */
+route("/guest/checkout", { POST: async ({ user, body }) => {
+  const d = await body();
+  const errors: Record<string, string[]> = {};
+  const name = String(d.name ?? "").trim().replace(/\s+/g, " ").slice(0, 150);
+  const email = String(d.email ?? "").trim().toLowerCase();
+  if (name.length < 2) errors.name = ["Please enter your name."];
+  if (!EMAIL_RE.test(email) || email.length > 254) errors.email = ["Enter a valid email address."];
+  let addr: Record<string, any> = {};
+  try {
+    addr = checkPhone(validate({ ...d, label: "Home", country: "India", is_default: true }, ADDRESS as any), false);
+  } catch (e) {
+    if (e instanceof HttpError) Object.assign(errors, (e as any).body ?? {}); else throw e;
+  }
+  const lines = (Array.isArray(d.items) ? d.items : []).slice(0, 50)
+    .map((i: any) => ({ variant_id: Number(i?.variant_id), quantity: Math.min(20, Math.max(1, Number(i?.quantity) || 1)) }))
+    .filter((i: any) => Number.isInteger(i.variant_id) && i.variant_id > 0);
+  if (!lines.length) errors.items = ["Your cart is empty."];
+  if (Object.keys(errors).length) throw bad(errors);
+
+  const variants = await sql`select id, stock from app_productvariant where id in ${sql(lines.map((l: any) => l.variant_id))}`;
+  const stock = new Map(variants.map((v: any) => [v.id, v.stock]));
+  const missing = lines.filter((l: any) => !stock.has(l.variant_id) || stock.get(l.variant_id) < 1);
+  if (missing.length) return json({ error: "Some items in your cart are no longer available. Please remove them and try again." }, 400);
+
+  const [first, ...rest] = name.split(" ");
+  const reuse = user && isGuest(user.username) ? user.id : null; // same browser retrying: reuse the guest record
+  const { userId, token, shipping } = await sql.begin(async (tx) => {
+    let userId = reuse as number | null;
+    if (userId) {
+      await tx`update auth_user set first_name = ${first.slice(0, 150)}, last_name = ${rest.join(" ").slice(0, 150)}, email = ${email} where id = ${userId}`;
+    } else {
+      const username = GUEST_PREFIX + newTokenKey().slice(0, 16);
+      // "!" + random = Django's "unusable password": nobody can log in to a guest record.
+      const [u] = await tx`insert into auth_user (password, is_superuser, username, first_name, last_name, email, is_staff, is_active, date_joined)
+                           values (${"!" + newTokenKey()}, false, ${username}, ${first.slice(0, 150)}, ${rest.join(" ").slice(0, 150)},
+                                   ${email}, false, true, now()) returning id`;
+      userId = u.id as number;
+    }
+    const [t] = await tx`insert into authtoken_token (key, created, user_id) values (${newTokenKey()}, now(), ${userId})
+                         on conflict (user_id) do update set user_id = excluded.user_id returning key`;
+    await tx`update app_address set is_default = false where user_id = ${userId} and is_default`;
+    const [shipping] = await tx`insert into app_address ${sql({ ...addr, user_id: userId, created_at: new Date().toISOString() })} returning *`;
+    const [c] = await tx`insert into app_cart (created_at, user_id) values (now(), ${userId})
+                         on conflict (user_id) do update set user_id = excluded.user_id returning id`;
+    await tx`delete from app_cartitem where cart_id = ${c.id}`;
+    for (const l of lines) {
+      await tx`insert into app_cartitem (quantity, cart_id, variant_id) values (${l.quantity}, ${c.id}, ${l.variant_id})`;
+    }
+    return { userId: userId!, token: t.key as string, shipping };
+  });
+
+  const out = await startRazorpayOrder(userId, shipping, shipping);
+  if (out instanceof Response) return out;
+  return json({ ...out, guest_token: token });
+} });
+
+// =============================================================== payments
+/** Turn the user's cart into a pending order + Razorpay order. Returns the checkout payload, or an error response. */
+async function startRazorpayOrder(userId: number, shipping: any, billing: any) {
+  const u = { id: userId };
   const cartId = await cartIdFor(u.id);
   const items = await sql`select ci.quantity, v.id as variant_id, v.price from app_cartitem ci
                           join app_productvariant v on v.id = ci.variant_id where ci.cart_id = ${cartId} order by ci.id`;
@@ -469,7 +535,24 @@ route("/payment/create", { POST: async ({ user, body }) => {
     return o.id as number;
   });
 
-  return json({ order_id: rzpOrder.id, db_order_id: orderId, amount: total / 100, currency: "INR", key: razorpayKeyId() });
+  return { order_id: rzpOrder.id, db_order_id: orderId, amount: total / 100, currency: "INR", key: razorpayKeyId() };
+}
+
+route("/payment/create", { POST: async ({ user, body }) => {
+  const u = requireUser(user);
+  const d = await body();
+  const pick = async (id: unknown) =>
+    id && /^\d+$/.test(String(id)) ? (await sql`select * from app_address where id = ${Number(id)} and user_id = ${u.id}`)[0] : undefined;
+  let shipping = await pick(d.shipping_address_id);
+  if (!shipping) [shipping] = await sql`select * from app_address where user_id = ${u.id} order by is_default desc, id desc limit 1`;
+  if (!shipping) return json({ error: "Please provide a valid shipping address" }, 400);
+  if (!/^[6-9]\d{9}$/.test(String(shipping.phone ?? "").replace(/\D/g, "").replace(/^(91|0)(?=\d{10}$)/, ""))) {
+    return json({ error: "Please add a 10-digit mobile number to your delivery address." }, 400);
+  }
+  const billing = (await pick(d.billing_address_id)) ?? shipping;
+
+  const out = await startRazorpayOrder(u.id, shipping, billing);
+  return out instanceof Response ? out : json(out);
 } });
 
 /** Fallback used by verify + webhook when no order exists yet for a paid Razorpay order. */
