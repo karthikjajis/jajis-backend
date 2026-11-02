@@ -704,7 +704,12 @@ Deno.serve(async (req) => {
     if (!handler) throw new HttpError(405, { detail: `Method "${req.method}" not allowed.` });
     const m = path.match(r.pattern)!;
     const params = Object.fromEntries(r.keys.map((k, i) => [k, decodeURIComponent(m[i + 1])]));
-    const user = r.noAuth ? null : await authenticate(req);
+    // An expired or unknown login must not break public pages (products, salons...):
+    // treat it as "not signed in". Pages that need a login still answer 401 via requireUser/staff().
+    let user = null as Awaited<ReturnType<typeof authenticate>>;
+    if (!r.noAuth) {
+      try { user = await authenticate(req); } catch (e) { if (!(e instanceof HttpError && e.status === 401)) throw e; }
+    }
     let cached: Promise<Record<string, any>> | null = null;
     const res = await handler({ req, user, params, body: () => (cached ??= readBody(req)) });
     return withCors(res);
