@@ -225,13 +225,13 @@ async function findOrCreateGuest(center: any, p: { first_name: string; last_name
 }
 
 // ---------------------------------------------------------------- bookings
-async function openBooking(row: { center_id: string; guest_id: string; service_id: string; date: string; therapist_gender: number }) {
+async function openBooking(row: { center_id: string; guest_id: string; service_id: string; date: string; therapist_gender: number }, onlyCatalog = true) {
   const item: any = { item: { id: row.service_id } };
   if (row.therapist_gender) item.therapist = { Gender: row.therapist_gender };
   const d = await z("POST", "/v1/bookings?is_double_booking_enabled=false", {
     center_id: row.center_id,
     date: row.date,
-    is_only_catalog_employees: true,
+    is_only_catalog_employees: onlyCatalog,
     guests: [{ id: row.guest_id, items: [item] }],
   });
   console.log("zenoti booking raw", JSON.stringify(d).slice(0, 1500));
@@ -332,6 +332,10 @@ export function zenotiRoutes(route: RouteFn) {
     try {
       const bookingId = await openBooking({ center_id: r.center_id, guest_id: r.guest_id, service_id: r.service_id, date, therapist_gender: r.therapist_gender });
       const s = await slotsFor(bookingId);
+      if (!s.slots.length && Deno.env.get("ZENOTI_DIAG") !== "off") {
+        // diagnostic only: does Zenoti have times when every stylist is allowed? (not used for the customer)
+        try { const b2 = await openBooking({ center_id: r.center_id, guest_id: r.guest_id, service_id: r.service_id, date, therapist_gender: r.therapist_gender }, false); const s2 = await slotsFor(b2); console.log("zenoti diag all-employees slots", s2.slots.length, s2.next_available_day); } catch (e) { console.log("zenoti diag failed", String(e)); }
+      }
       await sql`update api_zenoti_booking set booking_id = ${bookingId}, date = ${date}, updated_at = now() where ref = ${r.ref}`;
       return json({ ref: r.ref, date, ...s });
     } catch (e) { friendly(e, "Could not check availability."); }
