@@ -82,6 +82,57 @@ async function cached<T>(key: string, ms: number, fn: () => Promise<T>): Promise
 }
 
 // ---------------------------------------------------------------- catalogue
+// Zenoti names are typed in by staff ("JAJIS INNOVATION PVT LTD PARAVUR", "HAIR CUT(gents)"): make them readable.
+const SMALL = new Set(["and", "or", "of", "for", "with", "the", "in", "on", "to", "a"]);
+const KEEP = new Set(["DIY", "UV", "SPF", "BB", "CC", "TVM", "RP", "O3+", "VLCC", "PRP", "HD", "3D", "K18", "KSRTC", "MG", "NH"]);
+export function prettyName(raw: string): string {
+  let s = String(raw ?? "").replace(/\s+/g, " ").replace(/\s*\(\s*/g, " (").replace(/\s*\)/g, ")").replace(/\s*,\s*/g, ", ").trim();
+  const letters = s.replace(/[^A-Za-z]/g, "");
+  const shouty = letters.length > 0 && letters.replace(/[^A-Z]/g, "").length / letters.length > 0.6;
+  if (!shouty) return s.charAt(0).toUpperCase() + s.slice(1);
+  return s.toLowerCase().split(" ").map((w, i) => {
+    const up = w.toUpperCase();
+    if (KEEP.has(up.replace(/[(),]/g, ""))) return up;
+    if (i > 0 && SMALL.has(w)) return w;
+    return w.replace(/^([(]?)([a-z])/, (_, p, c) => p + c.toUpperCase());
+  }).join(" ");
+}
+
+const CATEGORY_RULES: [RegExp, string][] = [
+  [/bridal|bride|wedding|engagement|reception|saree draping|party make ?up|make ?up/i, "Bridal & makeup"],
+  [/hair ?cut|haircut|trim|fringe|styling|blow ?dry|iron|curl|crimp|updo|bun|braid/i, "Haircuts & styling"],
+  [/colou?r|highlight|balayage|ombre|global|root touch|henna|mehendi|grey/i, "Hair colour"],
+  [/keratin|smooth|straighten|rebond|botox|nanoplast|cysteine|perm|treatment|spa|scalp|dandruff|hair fall|olaplex|k18/i, "Hair treatments & spa"],
+  [/facial|clean ?up|peel|glow|skin|detan|de-tan|bleach|hydra|acne|pigment|wrinkle|charcoal|derma/i, "Facials & skin"],
+  [/wax|thread|eyebrow|upper lip|chin|forehead|full face|under ?arm|epil/i, "Waxing & threading"],
+  [/mani|pedi|nail|gel polish|extension/i, "Hands, feet & nails"],
+  [/massage|body|polish|scrub|head massage|back|foot reflex|potli/i, "Massage & body"],
+  [/shave|beard|moustache|men|gents/i, "Men's grooming"],
+];
+function guessCategory(name: string) {
+  for (const [re, cat] of CATEGORY_RULES) if (re.test(name)) return cat;
+  return "Other services";
+}
+const ORDER = CATEGORY_RULES.map(([, c]) => c);
+const catOrder = (c: string) => { const i = ORDER.indexOf(c); return i < 0 ? 99 : i; };
+
+// Friendly salon names. Matches the place words in Zenoti's center name / code / city.
+const PLACES: [RegExp, string][] = [
+  [/\brp\b|rp ?mall|jirp/i, "RP Mall, Kollam"],
+  [/knply|karunagap|jikp/i, "Karunagappally"],
+  [/pltd|polayath/i, "Polayathodu, Kollam"],
+  [/sasthamcott|sasthamkott/i, "Sasthamcotta"],
+  [/paravur|paravoor/i, "Paravur"],
+  [/\btvm\b|thiruvanan|trivandrum|vazhuthac/i, "Vazhuthacaud, Thiruvananthapuram"],
+  [/tripuni|thripuni/i, "Tripunithura"],
+];
+function centerName(c: any, city: string | null) {
+  const hay = `${c.display_name ?? ""} ${c.name ?? ""} ${c.code ?? ""} ${city ?? ""}`;
+  for (const [re, place] of PLACES) if (re.test(hay)) return `Jaji's ${place}`;
+  const rest = String(pick(c.display_name, c.name) ?? "").replace(/jaji'?s?\s*(inno\w*)?\s*(pvt\.?\s*ltd\.?)?/i, "").trim();
+  return `Jaji's ${prettyName(rest || city || "salon")}`;
+}
+const HIDDEN_CENTER = /warehouse|store ?room|head ?office|\btest\b|training/i;
 const pick = (...vals: any[]) => vals.find((v) => v !== undefined && v !== null && v !== "");
 
 async function centers() {
@@ -92,18 +143,20 @@ async function centers() {
     return list
       .filter((c) => !only.length || only.includes(c.id))
       .filter((c) => c.online_booking_enabled !== false && c.is_active !== false)
+      .filter((c) => !HIDDEN_CENTER.test(`${c.name ?? ""} ${c.display_name ?? ""}`))
       .map((c) => {
         const a = c.address_info ?? c.address ?? {};
+        const city = pick(a.city, c.city) ?? null;
         return {
           id: c.id,
-          name: pick(c.display_name, c.name),
-          code: c.code ?? null,
-          city: pick(a.city, c.city) ?? null,
-          address: [a.address_1, a.address_2, a.city].filter(Boolean).join(", ") || null,
+          name: centerName(c, city),
+          city: city ? prettyName(city) : null,
+          address: prettyName([a.address_1, a.address_2].filter(Boolean).join(", ")) || null,
           phone: pick(c.contact_info?.phone_1?.number, c.contact_info?.phone?.number, c.phone) ?? null,
           country_id: pick(a.country_id, c.country?.id, c.country_id) ?? null,
         };
-      });
+      })
+      .sort((x, y) => x.name.localeCompare(y.name));
   });
 }
 
@@ -111,24 +164,28 @@ async function services(centerId: string) {
   return cached(`services:${centerId}`, 10 * 60_000, async () => {
     const out: any[] = [];
     for (let page = 1; page <= 10; page++) {
-      const d = await z("GET", `/v1/Centers/${centerId}/services?page=${page}&size=100&catalog_enabled=true&expand=category`);
+      const d = await z("GET", `/v1/Centers/${centerId}/services?page=${page}&size=100&expand=additional_info&expand=catalog_info`);
       const list: any[] = d?.services ?? [];
       out.push(...list);
       const total = d?.page_info?.total ?? 0;
       if (!list.length || out.length >= total) break;
     }
-    if (out[0]) console.log("zenoti service sample", JSON.stringify(out[0]).slice(0, 2500));
+    if (out[0]) console.log("zenoti service extra", JSON.stringify({ a: out[0].additional_info, c: out[0].catalog_info }).slice(0, 1500));
     return out
-      .filter((s) => s.catalog_info?.show_in_catalog !== false && s.is_addon !== true && s.is_active !== false)
-      .map((s) => ({
-        id: s.id,
-        name: s.name,
-        description: s.description || null,
-        category: pick(s.category_name, s.category?.name, s.additional_info?.category?.name) ?? "Services",
-        duration: Number(pick(s.duration, s.time_info?.duration) ?? 0) || null,
-        price: Number(pick(s.price_info?.sale_price, s.price_info?.price, s.price) ?? 0) || null,
-      }))
-      .sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
+      .filter((s) => s.allow_direct_booking !== false && s.catalog_info?.show_in_catalog !== false && s.is_addon !== true && s.is_active !== false)
+      .map((s) => {
+        const name = prettyName(s.name);
+        const cat = pick(s.category_name, s.category?.name, s.additional_info?.category?.name, s.additional_info?.sub_category?.name);
+        return {
+          id: s.id,
+          name,
+          description: s.description || null,
+          category: cat ? prettyName(cat) : guessCategory(name),
+          duration: Number(pick(s.duration, s.time_info?.duration) ?? 0) || null,
+          price: Number(pick(s.price_info?.final_price, s.price_info?.sale_price, s.price_info?.price, s.price) ?? 0) || null,
+        };
+      })
+      .sort((a, b) => catOrder(a.category) - catOrder(b.category) || a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
   });
 }
 
