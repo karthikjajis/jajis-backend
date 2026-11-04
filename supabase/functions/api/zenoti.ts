@@ -170,7 +170,6 @@ async function services(centerId: string) {
       const total = d?.page_info?.total ?? 0;
       if (!list.length || out.length >= total) break;
     }
-    if (out[0]) console.log("zenoti service extra", JSON.stringify({ a: out[0].additional_info, c: out[0].catalog_info }).slice(0, 1500));
     return out
       .filter((s) => s.allow_direct_booking !== false && s.catalog_info?.show_in_catalog !== false && s.is_addon !== true && s.is_active !== false)
       .map((s) => {
@@ -235,6 +234,7 @@ async function openBooking(row: { center_id: string; guest_id: string; service_i
     is_only_catalog_employees: true,
     guests: [{ id: row.guest_id, items: [item] }],
   });
+  console.log("zenoti booking raw", JSON.stringify(d).slice(0, 1500));
   const id = d?.id ?? d?.booking_id;
   if (!id) throw new ZenotiError(500, "Could not open a booking.", d);
   return id as string;
@@ -242,6 +242,7 @@ async function openBooking(row: { center_id: string; guest_id: string; service_i
 
 async function slotsFor(bookingId: string) {
   const d = await z("GET", `/v1/bookings/${bookingId}/slots?check_future_day_availability=true`);
+  console.log("zenoti slots raw", JSON.stringify(d).slice(0, 1500));
   const raw: any[] = d?.slots ?? d?.Slots ?? [];
   const slots = raw
     .filter((s) => (s.Available ?? s.available) !== false)
