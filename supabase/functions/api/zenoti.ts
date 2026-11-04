@@ -117,6 +117,7 @@ async function services(centerId: string) {
       const total = d?.page_info?.total ?? 0;
       if (!list.length || out.length >= total) break;
     }
+    if (out[0]) console.log("zenoti service sample", JSON.stringify(out[0]).slice(0, 2500));
     return out
       .filter((s) => s.catalog_info?.show_in_catalog !== false && s.is_addon !== true && s.is_active !== false)
       .map((s) => ({
