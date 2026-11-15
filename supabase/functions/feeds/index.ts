@@ -13,6 +13,8 @@ const sql = postgres(url, { prepare: false, max: 2, idle_timeout: 20 });
 const STATIC_PAGES = [
   ["/", "1.0"],
   ["/products", "0.9"],
+  ["/kollam", "0.9"],
+  ["/book", "0.9"],
   ["/salons", "0.8"],
   ["/house-of-jajis", "0.8"],
   ["/cosmetics", "0.7"],
