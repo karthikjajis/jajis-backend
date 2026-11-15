@@ -231,6 +231,8 @@ function showErrors(root, fields) {
 
 // ===================================================================== simple resources (website content)
 const IMG = (k, label, folder, req) => ({ k, label, type: "image", folder, req });
+const CAREER_BRANCHES = ["RP Mall, Kollam", "Polayathodu, Kollam", "Karunagappally", "Sasthamcotta", "Paravur", "Vazhuthacaud, Trivandrum",
+  "Head Office, Kollam", "Q Café & Event Hall, Kollam", "Food Court, Kollam", "Designing & Stitching Studio, Polayathodu", "Jaji's Academy, Polayathodu"];
 const RES = {
   categories: { title: "Categories", sub: "Product categories shown as filters in the shop.", fields: [{ k: "name", label: "Name", req: 1 }],
     cols: [["Name", (r) => esc(r.name)]] },
@@ -272,6 +274,21 @@ const RES = {
         e.target.disabled = false;
       };
     } },
+  jobs: { title: "Jobs", sub: "Openings shown on jajisinnovation.com/careers and in Google's Jobs search. Close a job (or set an end date) when it's filled — Google drops it automatically.",
+    fields: [{ k: "title", label: "Job title", req: 1, placeholder: "e.g. Senior Hair Stylist" },
+      { k: "branch", label: "Branch", req: 1, type: "select", options: CAREER_BRANCHES.map((b) => [b, b]) },
+      { k: "employment_type", label: "Type", req: 1, type: "select", options: [["FULL_TIME", "Full-time"], ["PART_TIME", "Part-time"], ["INTERN", "Internship"], ["CONTRACTOR", "Contract"], ["TEMPORARY", "Temporary"]] },
+      { k: "is_active", label: "Status", req: 1, type: "select", options: [["true", "Open — show on website"], ["false", "Closed — hidden"]] },
+      { k: "salary_min", label: "Salary from (₹ / month, optional)", type: "number", step: "1" },
+      { k: "salary_max", label: "Salary up to (₹ / month, optional)", type: "number", step: "1" },
+      { k: "experience", label: "Experience needed", placeholder: "e.g. 2+ years" },
+      { k: "valid_through", label: "Show until (optional)", type: "date" },
+      { k: "description", label: "Description (blank line = new paragraph, start lines with - for bullet points)", type: "textarea", req: 1 }],
+    cols: [["Job", (r) => `<b>${esc(r.title)}</b>`], ["Branch", (r) => esc(r.branch)],
+      ["Salary", (r) => r.salary_min || r.salary_max ? [r.salary_min, r.salary_max].filter(Boolean).map(inr).join(" – ") : '<span class="mute">—</span>'],
+      ["Status", (r) => r.is_active && (!r.valid_through || r.valid_through >= new Date().toISOString().slice(0, 10)) ? badge("open", "b-green") : badge("closed", "b-gray")],
+      ["Until", (r) => r.valid_through ? d(r.valid_through) : '<span class="mute">—</span>'],
+      ["", (r) => `<a href="https://www.jajisinnovation.com/careers/${r.id}" target="_blank" onclick="event.stopPropagation()">View</a>`]] },
   eventhall: { title: "Event hall bookings", sub: "Enquiries from the website. A booked date can't be chosen again online — add a booking here to block a date.",
     fields: [{ k: "name", label: "Name", req: 1 }, { k: "phone", label: "Phone", req: 1 }, { k: "email", label: "Email", req: 1, type: "email" },
       { k: "event_date", label: "Event date", req: 1, type: "date" },
@@ -519,6 +536,55 @@ async function productDrawer(id, onChange) {
   });
 }
 
+// ===================================================================== job applications
+const APP_STATUS = [["new", "New", "b-blue"], ["shortlisted", "Shortlisted", "b-amber"], ["interview", "Interview", "b-amber"], ["hired", "Hired", "b-green"], ["rejected", "Rejected", "b-gray"]];
+const appBadge = (s) => { const x = APP_STATUS.find((a) => a[0] === s) || [s, s, "b-gray"]; return badge(x[1], x[2]); };
+async function applicationsPage() {
+  view(`<h1>Job applications</h1><p class="sub">From jajisinnovation.com/careers. Each one is also emailed to managingdirector@jajis.in and head.operations@jajis.in.</p>
+    <div class="bar"><div class="tabs" id="tabs"><button class="on" data-s="">All</button>${APP_STATUS.map(([k, l]) => `<button data-s="${k}">${l}</button>`).join("")}</div>
+    <div class="grow"></div><input class="search" id="q" placeholder="Search name, phone, job…"></div>
+    <div class="card tbl" id="list"><div class="empty">Loading…</div></div>`);
+  let rows = await api("/admin/r/applications"), st = "";
+  const draw = () => {
+    const t = $("#q").value.toLowerCase();
+    const shown = rows.filter((r) => (!st || r.status === st) && (!t || JSON.stringify(r).toLowerCase().includes(t)));
+    $("#list").innerHTML = shown.length ? `<table><tr><th>Received</th><th>Name</th><th>Job</th><th>Phone</th><th>CV</th><th>Status</th></tr>
+      ${shown.map((r) => `<tr class="click" data-id="${r.id}"><td class="mute">${dt(r.created_at)}</td><td><b>${esc(r.name)}</b><div class="mute">${esc(r.city || "")}</div></td>
+        <td>${esc(r.job_title || "General (CV only)")}</td><td>${esc(r.phone)}</td><td>${r.resume_path ? "📎" : ""}</td><td>${appBadge(r.status)}</td></tr>`).join("")}</table>`
+      : '<div class="empty">No applications here yet.</div>';
+    $("#list").querySelectorAll("tr[data-id]").forEach((tr) => tr.onclick = () => show(rows.find((r) => r.id == tr.dataset.id)));
+  };
+  const show = (r) => {
+    const dr = drawer(`<button class="x">×</button><h2>${esc(r.name)}</h2><div class="mute">${esc(r.job_title || "General application")} · ${dt(r.created_at)}</div>
+      <div class="bar" style="margin-top:14px"><a class="btn sm" href="tel:${esc(r.phone)}">Call</a>
+        <a class="btn ghost sm" href="https://wa.me/91${esc(r.phone)}" target="_blank">WhatsApp</a>
+        ${r.email ? `<a class="btn ghost sm" href="mailto:${esc(r.email)}">Email</a>` : ""}
+        ${r.resume_path ? '<button class="btn ghost sm" id="cv">Open CV</button>' : ""}</div>
+      <div class="kv" style="margin-top:12px">${[["Phone", r.phone], ["Email", r.email], ["City", r.city], ["Experience", r.experience], ["Message", r.message], ["CV file", r.resume_name]]
+        .map(([l, v]) => `<div>${l}</div><div>${esc(v || "—")}</div>`).join("")}</div>
+      <div class="grid2" style="margin-top:16px">
+        <div class="f"><label for="f_status">Status</label><select id="f_status">${APP_STATUS.map(([k, l]) => `<option value="${k}" ${r.status === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+        <div class="f full"><label for="f_notes">Notes (only staff see this)</label><textarea id="f_notes">${esc(r.notes || "")}</textarea></div></div>
+      <div class="actions"><button class="btn red" id="del">Delete</button><div style="flex:1"></div><button class="btn" id="save">Save</button></div>`);
+    dr.querySelector(".x").onclick = closeDrawer;
+    dr.querySelector("#cv")?.addEventListener("click", async () => {
+      const w = window.open("", "_blank");
+      try { const { url } = await api(`/admin/applications/${r.id}/resume`); if (w) w.location = url; else location.href = url; }
+      catch (e) { w?.close(); toast(e.message, true); }
+    });
+    dr.querySelector("#save").onclick = async (e) => {
+      e.target.disabled = true;
+      try {
+        const u = await api("/admin/r/applications/" + r.id, { method: "PATCH", body: { status: dr.querySelector("#f_status").value, notes: dr.querySelector("#f_notes").value } });
+        Object.assign(r, u); closeDrawer(); draw(); toast("Saved");
+      } catch (err) { toast(err.message, true); e.target.disabled = false; }
+    };
+    dr.querySelector("#del").onclick = async () => { if (!confirmDelete()) return; await api("/admin/r/applications/" + r.id, { method: "DELETE" }); closeDrawer(); rows = rows.filter((x) => x.id !== r.id); draw(); toast("Deleted"); };
+  };
+  $("#tabs").querySelectorAll("button").forEach((b) => b.onclick = () => { $("#tabs").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b)); st = b.dataset.s; draw(); });
+  $("#q").oninput = draw; draw();
+}
+
 // ===================================================================== franchise enquiries
 async function franchisePage() {
   view(`<h1>Franchise enquiries</h1><p class="sub">Applications from the website's Franchise page (private — no longer visible to the public).</p>
@@ -630,6 +696,7 @@ const PAGES = [
   ["Shop", [["orders", "Orders", ordersPage], ["products", "Products", productsPage], ["categories", "Categories", () => resourcePage("categories")],
     ["payments", "Payments", paymentsPage], ["shipping", "Shipping charges", () => resourcePage("shipping")], ["customers", "Customers", customersPage]]],
   ["Leads", [["eventhall", "Event hall bookings", () => resourcePage("eventhall")], ["franchise", "Franchise enquiries", franchisePage]]],
+  ["Careers", [["jobs", "Jobs", () => resourcePage("jobs")], ["applications", "Job applications", applicationsPage]]],
   ["Website", [["banners", "Home banner", () => resourcePage("banners")], ["salons", "Salons", () => resourcePage("salons")],
     ["courses", "Academy courses", () => resourcePage("courses")], ["food", "Food court menu", () => resourcePage("food")], ["cosmetics", "Cosmetics", () => resourcePage("cosmetics")]]],
 ];
