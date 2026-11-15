@@ -16,6 +16,7 @@ const STATIC_PAGES = [
   ["/kollam", "0.9"],
   ["/book", "0.9"],
   ["/salons", "0.8"],
+  ["/careers", "0.8"],
   ["/house-of-jajis", "0.8"],
   ["/cosmetics", "0.7"],
   ["/academy", "0.7"],
@@ -30,6 +31,9 @@ const STATIC_PAGES = [
   ["/terms", "0.2"],
   ["/privacy", "0.2"],
 ];
+
+export const jobSlug = (id: number, title: string) =>
+  `${id}-${String(title).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60)}`;
 
 const esc = (v: unknown) =>
   String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" }[c]!));
@@ -60,8 +64,11 @@ async function products() {
 
 async function sitemap() {
   const rows = await sql`select id, coalesce(updated_at, created_at) as updated from app_product order by id`;
+  const jobs = await sql`select id, title, coalesce(updated_at, created_at) as updated from app_job
+    where is_active and (valid_through is null or valid_through >= (now() at time zone 'Asia/Kolkata')::date) order by id`.catch(() => []);
   const urls = [
     ...STATIC_PAGES.map(([path, pr]) => `<url><loc>${SITE}${path}</loc><priority>${pr}</priority></url>`),
+    ...jobs.map((j) => `<url><loc>${SITE}/careers/${jobSlug(j.id, j.title)}</loc><lastmod>${new Date(j.updated).toISOString().slice(0, 10)}</lastmod><priority>0.8</priority></url>`),
     ...rows.map(
       (r) =>
         `<url><loc>${SITE}/product/${r.id}</loc>${

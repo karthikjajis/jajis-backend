@@ -435,3 +435,31 @@ Investment Details:
     send([ADMIN_EMAIL], `New Franchise Partner Enquiry - ${q.full_name} (${q.preferred_city})`, adminText, adminHtml),
   ]);
 }
+
+// ---------------------------------------------------------------- careers
+const CAREERS_EMAIL = () => Deno.env.get("CAREERS_EMAIL") ?? ADMIN_EMAIL;
+
+export async function sendJobApplicationEmails(a: Record<string, any>, resumeLink: string | null) {
+  const role = a.job_title || "General application";
+  const rows: [string, unknown][] = [
+    ["Position", role], ["Name", a.name], ["Phone", a.phone], ["Email", a.email || "—"], ["City", a.city || "—"],
+    ["Experience", a.experience || "—"], ["Message", a.message || "—"], ["CV", resumeLink ? "Attached link (valid 7 days)" : "Not uploaded"],
+  ];
+  const text = `New job application on jajisinnovation.com\n\n${rows.map(([k, v]) => `${k}: ${v}`).join("\n")}${resumeLink ? `\n\nCV: ${resumeLink}` : ""}\n\nSee all applications in the admin panel → Careers.`;
+  const html = shell("New job application", `
+        <tr><td style="padding-bottom:16px;font-size:16px;color:#111827;">New application for <b>${esc(role)}</b></td></tr>
+        <tr><td><table width="100%" cellpadding="6" style="border-collapse:collapse;font-size:14px;color:#374151;">
+          ${rows.map(([k, v]) => `<tr><td style="width:120px;color:#6b7280;vertical-align:top;">${esc(k)}</td><td>${esc(v)}</td></tr>`).join("")}
+        </table></td></tr>
+        ${resumeLink ? `<tr><td style="padding-top:18px;"><a href="${esc(resumeLink)}" style="background:#111;color:#fff;padding:10px 18px;text-decoration:none;border-radius:4px;">Open CV</a></td></tr>` : ""}
+        <tr><td style="padding-top:18px;font-size:13px;color:#6b7280;">All applications are in the admin panel → Careers.</td></tr>`);
+  const hr = await send([CAREERS_EMAIL()], `Job application: ${role} — ${a.name}`, text, html);
+  if (a.email) {
+    const t2 = `Dear ${a.name},\n\nThank you for applying for ${role} at Jaji's Innovation. Our HR team will review your application and contact you if your profile matches.\n\nBest regards,\nJaji's Innovation Pvt. Ltd.\nwww.jajisinnovation.com/careers`;
+    const h2 = shell("Application received", `
+        <tr><td style="font-size:15px;color:#374151;line-height:1.6;">Dear ${esc(a.name)},<br><br>Thank you for applying for <b>${esc(role)}</b> at Jaji's Innovation.
+        Our HR team will review your application and contact you if your profile matches.<br><br>Best regards,<br>Jaji's Innovation Pvt. Ltd.</td></tr>`);
+    await send([a.email], `We received your application — ${role}`, t2, h2);
+  }
+  return hr;
+}

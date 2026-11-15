@@ -14,6 +14,7 @@ import {
 import { adminRoutes } from "./admin.ts";
 import { staffRoutes } from "./staff.ts";
 import { zenotiRoutes } from "./zenoti.ts";
+import { careersRoutes } from "./careers.ts";
 
 type Ctx = { req: Request; user: User | null; params: Record<string, string>; body: () => Promise<Record<string, any>> };
 type Handler = (c: Ctx) => Promise<Response> | Response;
@@ -692,6 +693,7 @@ route("/orders/:id", { GET: async ({ user, params }) => {
 adminRoutes(route);
 staffRoutes(route);
 zenotiRoutes(route);
+careersRoutes(route);
 
 // =============================================================== server
 Deno.serve(async (req) => {

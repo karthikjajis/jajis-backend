@@ -1,9 +1,10 @@
 // Admin API used by the new Jaji's admin panel (replaces /admin and /ecommerce/admin in Django).
 // Every route needs a staff user's token (is_staff = true in auth_user).
 import { sql, iso, money, paise } from "./db.ts";
-import { bad, checkPassword, HttpError, img, json, newTokenKey, notFound, type User } from "./util.ts";
+import { background, bad, checkPassword, HttpError, img, json, newTokenKey, notFound, type User } from "./util.ts";
 import { clearShippingCache, emailOrder, ordersJson, syncOrderWithRazorpay, whatsappOrder, whatsappShipped } from "./shop.ts";
 import { emailStatus, sendTestEmail } from "./email.ts";
+import { BRANCHES, EMPLOYMENT, deleteResume } from "./careers.ts";
 import { adminNumbers, sendTemplate, WA, whatsappConfigured } from "./whatsapp.ts";
 
 type Ctx = { req: Request; user: User | null; params: Record<string, string>; body: () => Promise<Record<string, any>> };
@@ -18,7 +19,7 @@ const id = (v: string) => { if (!/^\d+$/.test(v)) throw notFound(); return Numbe
 
 // ------------------------------------------------------------------ editable tables
 type Col = { t: "str" | "text" | "img" | "money" | "int" | "fk" | "bool" | "date" | "choice"; max?: number; req?: boolean; nullable?: boolean; choices?: string[]; def?: unknown };
-type Res = { table: string; cols: Record<string, Col>; order: string; created?: string; updated?: string; readOnly?: boolean; search?: string[] };
+type Res = { table: string; cols: Record<string, Col>; order: string; created?: string; updated?: string; readOnly?: boolean; noCreate?: boolean; search?: string[] };
 
 const S = (max: number, req = true): Col => ({ t: "str", max, req, nullable: !req });
 const IMG = (req = false): Col => ({ t: "img", max: 100, req, nullable: !req });
@@ -57,6 +58,18 @@ const RES: Record<string, Res> = {
   shipping: {
     table: "app_shipping_rate", order: "state", search: ["state", "district"],
     cols: { state: S(100), district: S(100, false), amount: { t: "money", req: true } },
+  },
+  jobs: {
+    table: "app_job", order: "created_at desc", created: "created_at", updated: "updated_at", search: ["title", "branch", "description"],
+    cols: {
+      title: S(150), branch: { t: "choice", req: true, choices: BRANCHES }, employment_type: { t: "choice", req: true, choices: EMPLOYMENT, def: "FULL_TIME" },
+      salary_min: { t: "money", nullable: true }, salary_max: { t: "money", nullable: true }, experience: S(100, false),
+      description: { t: "text", req: true }, is_active: { t: "bool", def: true }, valid_through: { t: "date", nullable: true },
+    },
+  },
+  applications: {
+    table: "app_job_application", order: "created_at desc", created: "created_at", noCreate: true, search: ["name", "phone", "email", "job_title", "city"],
+    cols: { status: { t: "choice", req: true, choices: ["new", "shortlisted", "interview", "hired", "rejected"] }, notes: { t: "text", nullable: true } },
   },
   franchise: { table: "app_franchiseenquiry", order: "created_at desc", created: "created_at", readOnly: true, cols: {}, search: ["full_name", "email", "mobile_number", "preferred_city"] },
 };
@@ -208,7 +221,7 @@ export function adminRoutes(route: RouteFn) {
     POST: async ({ user, params, body }) => {
       staff(user);
       if (params.res === "shipping") clearShippingCache();
-      const r = RES[params.res]; if (!r || r.readOnly) throw notFound();
+      const r = RES[params.res]; if (!r || r.readOnly || r.noCreate) throw notFound();
       const d = clean(r, await body(), false);
       if (r.created) d[r.created] = new Date().toISOString();
       if (r.updated) d[r.updated] = new Date().toISOString();
@@ -262,6 +275,10 @@ export function adminRoutes(route: RouteFn) {
         } else if (params.res === "categories") {
           const [{ n }] = await tx`select count(*)::int as n from app_product where category_id = ${rid}`;
           if (n) throw bad({ detail: `This category still has ${n} product(s). Move or delete them first.` });
+        }
+        if (params.res === "applications") {
+          const [ap] = await tx`select resume_path from app_job_application where id = ${rid}`;
+          if (ap?.resume_path) background(deleteResume(ap.resume_path));
         }
         await tx`delete from ${tx(r.table)} where id = ${rid}`;
       });
