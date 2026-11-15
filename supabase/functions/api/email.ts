@@ -437,7 +437,7 @@ Investment Details:
 }
 
 // ---------------------------------------------------------------- careers
-const CAREERS_EMAIL = () => Deno.env.get("CAREERS_EMAIL") ?? ADMIN_EMAIL;
+const CAREERS_EMAILS = () => (Deno.env.get("CAREERS_EMAIL") ?? "managingdirector@jajis.in,head.operations@jajis.in").split(",").map((e) => e.trim()).filter(Boolean);
 
 export async function sendJobApplicationEmails(a: Record<string, any>, resumeLink: string | null) {
   const role = a.job_title || "General application";
@@ -453,7 +453,7 @@ export async function sendJobApplicationEmails(a: Record<string, any>, resumeLin
         </table></td></tr>
         ${resumeLink ? `<tr><td style="padding-top:18px;"><a href="${esc(resumeLink)}" style="background:#111;color:#fff;padding:10px 18px;text-decoration:none;border-radius:4px;">Open CV</a></td></tr>` : ""}
         <tr><td style="padding-top:18px;font-size:13px;color:#6b7280;">All applications are in the admin panel → Careers.</td></tr>`);
-  const hr = await send([CAREERS_EMAIL()], `Job application: ${role} — ${a.name}`, text, html);
+  const hr = await send(CAREERS_EMAILS(), `Job application: ${role} — ${a.name}`, text, html);
   if (a.email) {
     const t2 = `Dear ${a.name},\n\nThank you for applying for ${role} at Jaji's Innovation. Our HR team will review your application and contact you if your profile matches.\n\nBest regards,\nJaji's Innovation Pvt. Ltd.\nwww.jajisinnovation.com/careers`;
     const h2 = shell("Application received", `
