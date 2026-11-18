@@ -540,7 +540,7 @@ async function productDrawer(id, onChange) {
 const APP_STATUS = [["new", "New", "b-blue"], ["shortlisted", "Shortlisted", "b-amber"], ["interview", "Interview", "b-amber"], ["hired", "Hired", "b-green"], ["rejected", "Rejected", "b-gray"]];
 const appBadge = (s) => { const x = APP_STATUS.find((a) => a[0] === s) || [s, s, "b-gray"]; return badge(x[1], x[2]); };
 async function applicationsPage() {
-  view(`<h1>Job applications</h1><p class="sub">From jajisinnovation.com/careers. Each one is also emailed to managingdirector@jajis.in and head.operations@jajis.in.</p>
+  view(`<h1>Job applications</h1><p class="sub">From jajisinnovation.com/careers. Each one is also emailed to managingdirector@jajis.in and head.operations@jajisinnovation.com.</p>
     <div class="bar"><div class="tabs" id="tabs"><button class="on" data-s="">All</button>${APP_STATUS.map(([k, l]) => `<button data-s="${k}">${l}</button>`).join("")}</div>
     <div class="grow"></div><input class="search" id="q" placeholder="Search name, phone, job…"></div>
     <div class="card tbl" id="list"><div class="empty">Loading…</div></div>`);

@@ -437,7 +437,7 @@ Investment Details:
 }
 
 // ---------------------------------------------------------------- careers
-const CAREERS_EMAILS = () => (Deno.env.get("CAREERS_EMAIL") ?? "managingdirector@jajis.in,head.operations@jajis.in").split(",").map((e) => e.trim()).filter(Boolean);
+const CAREERS_EMAILS = () => (Deno.env.get("CAREERS_EMAIL") ?? "managingdirector@jajis.in,head.operations@jajisinnovation.com").split(",").map((e) => e.trim()).filter(Boolean);
 
 export async function sendJobApplicationEmails(a: Record<string, any>, resumeLink: string | null) {
   const role = a.job_title || "General application";
