@@ -14,6 +14,7 @@ const STATIC_PAGES = [
   ["/", "1.0"],
   ["/products", "0.9"],
   ["/kollam", "0.9"],
+  ["/skin-hair-clinic", "0.9"],
   ["/book", "0.9"],
   ["/salons", "0.8"],
   ["/careers", "0.8"],
