@@ -12,7 +12,7 @@ type Ctx = { req: Request; user: User | null; params: Record<string, string>; bo
 type RouteFn = (path: string, methods: Record<string, (c: Ctx) => Promise<Response> | Response>, opts?: { noAuth?: boolean }) => void;
 
 export const BRANCHES = [
-  "RP Mall, Kollam", "Polayathodu, Kollam", "Karunagappally", "Sasthamcotta", "Paravur", "Vazhuthacaud, Trivandrum",
+  "RP Mall, Kollam", "Signature Skin & Hair Clinic, RP Mall", "Polayathodu, Kollam", "Karunagappally", "Sasthamcotta", "Paravur", "Vazhuthacaud, Trivandrum",
   "Head Office, Kollam", "Q Café & Event Hall, Kollam", "Food Court, Kollam", "Designing & Stitching Studio, Polayathodu", "Jaji's Academy, Polayathodu",
 ];
 export const EMPLOYMENT = ["FULL_TIME", "PART_TIME", "INTERN", "CONTRACTOR", "TEMPORARY"];
